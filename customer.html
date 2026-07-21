@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Katina — Menu</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #f4f5f7;
+            margin: 0;
+            padding-bottom: 100px;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        header h1 { margin: 0; font-size: 18px; }
+        header .sub { font-size: 13px; color: #bdc3c7; }
+
+        .container { padding: 16px; max-width: 500px; margin: 0 auto; }
+
+        .missing-session {
+            background: #fdebd0; color: #b9770e;
+            padding: 16px; border-radius: 10px; text-align: center;
+        }
+
+        h2 { font-size: 16px; color: #555; margin: 20px 0 10px; }
+
+        .menu-item {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .menu-item .name { font-weight: 600; }
+        .menu-item .price { color: #777; font-size: 13px; }
+        .menu-item button {
+            background: #2980b9; color: white; border: none;
+            width: 34px; height: 34px; border-radius: 50%;
+            font-size: 18px; cursor: pointer;
+        }
+
+        .cart-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #27ae60;
+            color: white;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .cart-bar.empty { display: none; }
+
+        .overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 20;
+        }
+        .sheet {
+            background: white;
+            border-radius: 16px 16px 0 0;
+            padding: 20px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .cart-line {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid #eee;
+        }
+        .qty-controls button {
+            background: #ecf0f1; border: none; width: 26px; height: 26px;
+            border-radius: 50%; cursor: pointer; font-size: 14px;
+        }
+        .submit-btn {
+            background: #27ae60; color: white; border: none;
+            padding: 12px; border-radius: 8px; width: 100%;
+            font-size: 15px; margin-top: 14px; cursor: pointer;
+        }
+        .close-sheet { float: right; cursor: pointer; font-size: 20px; color: #888; }
+
+        .order-status {
+            background: white; border-radius: 10px; padding: 12px;
+            margin-bottom: 8px; display: flex; justify-content: space-between;
+        }
+        .pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; }
+        .pill.PENDING_REVIEW { background: #fdebd0; color: #b9770e; }
+        .pill.APPROVED { background: #d5f5e3; color: #1e8449; }
+        .pill.REJECTED { background: #fadbd8; color: #922b21; }
+        .pill.CANCELLED { background: #eee; color: #888; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🍽️ Katina</h1>
+        <div class="sub" id="tableLabel">Loading table...</div>
+    </header>
+
+    <div class="container" id="app">
+        <p>Loading...</p>
+    </div>
+
+    <div class="cart-bar empty" id="cartBar" onclick="openCartSheet()">
+        <span id="cartSummary">0 items</span>
+        <span>View cart →</span>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="sheet">
+            <span class="close-sheet" onclick="closeCartSheet()">✕</span>
+            <h2>Your Cart</h2>
+            <div id="cartLines"></div>
+            <button class="submit-btn" onclick="submitCart()">Send Order to Waiter</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE = "http://127.0.0.1:8000";
+        const params = new URLSearchParams(window.location.search);
+        const tableId = params.get("table");
+
+        let sessionId = null;
+        let menu = {};
+        let cart = {}; // { item: qty }
+
+        function init() {
+            if (!tableId) {
+                document.getElementById("app").innerHTML = `
+                    <div class="missing-session">
+                        No table found in the link.<br>Please scan the QR code on your table.
+                    </div>`;
+                document.getElementById("tableLabel").innerText = "No table linked";
+                return;
+            }
+            document.getElementById("tableLabel").innerText = "Table: " + tableId;
+            checkForSession();
+        }
+
+        function checkForSession() {
+            fetch(`${BASE}/tables/${tableId}/active-session`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.active) {
+                        document.getElementById("app").innerHTML = `
+                            <div class="missing-session">
+                                Welcome! A member of staff will be with you shortly
+                                to get you started.
+                            </div>`;
+                        setTimeout(checkForSession, 4000);
+                        return;
+                    }
+
+                    sessionId = data.session_id;
+                    loadMenu();
+                    loadMyOrders();
+                    setInterval(loadMyOrders, 5000);
+                });
+        }
+
+        function loadMenu() {
+            fetch(`${BASE}/menu`)
+                .then(r => r.json())
+                .then(data => {
+                    menu = data;
+                    renderMenu();
+                });
+        }
+
+        function renderMenu() {
+            const app = document.getElementById("app");
+            let html = `<h2>Menu</h2>`;
+            for (const item in menu) {
+                html += `
+                    <div class="menu-item">
+                        <div>
+                            <div class="name">${item}</div>
+                            <div class="price">€${menu[item].toFixed(2)}</div>
+                        </div>
+                        <button onclick="addToCart('${item}')">+</button>
+                    </div>
+                `;
+            }
+            html += `<h2>Your Orders</h2><div id="ordersList"><p style="color:#999;">No orders yet.</p></div>`;
+            app.innerHTML = html;
+        }
+
+        function addToCart(item) {
+            cart[item] = (cart[item] || 0) + 1;
+            updateCartBar();
+        }
+
+        function changeQty(item, delta) {
+            cart[item] = (cart[item] || 0) + delta;
+            if (cart[item] <= 0) delete cart[item];
+            updateCartBar();
+            renderCartSheet();
+        }
+
+        function updateCartBar() {
+            const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+            const bar = document.getElementById("cartBar");
+            if (totalItems === 0) {
+                bar.classList.add("empty");
+            } else {
+                bar.classList.remove("empty");
+                document.getElementById("cartSummary").innerText = `${totalItems} item(s) in cart`;
+            }
+        }
+
+        function openCartSheet() {
+            renderCartSheet();
+            document.getElementById("overlay").style.display = "flex";
+        }
+        function closeCartSheet() {
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        function renderCartSheet() {
+            const div = document.getElementById("cartLines");
+            const items = Object.keys(cart);
+            div.innerHTML = items.length
+                ? items.map(item => `
+                    <div class="cart-line">
+                        <span>${item}</span>
+                        <span class="qty-controls">
+                            <button onclick="changeQty('${item}', -1)">−</button>
+                            &nbsp;${cart[item]}&nbsp;
+                            <button onclick="changeQty('${item}', 1)">+</button>
+                        </span>
+                    </div>
+                `).join("")
+                : "<p>Your cart is empty.</p>";
+        }
+
+        function submitCart() {
+            const items = Object.keys(cart);
+            if (items.length === 0) return alert("Add something to your cart first.");
+
+            const requests = items.map(item =>
+                fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}`, { method: "POST" })
+                    .then(r => r.json())
+            );
+
+            Promise.all(requests).then(() => {
+                cart = {};
+                updateCartBar();
+                closeCartSheet();
+                loadMyOrders();
+            });
+        }
+
+        function loadMyOrders() {
+            if (!sessionId) return;
+            fetch(`${BASE}/sessions/${sessionId}/orders`)
+                .then(r => r.json())
+                .then(orders => {
+                    const div = document.getElementById("ordersList");
+                    if (!div) return;
+                    div.innerHTML = orders.length
+                        ? orders.map(o => `
+                            <div class="order-status">
+                                <span>${o.qty}x ${o.item}</span>
+                                <span class="pill ${o.status}">${o.status.replace("_", " ")}</span>
+                            </div>
+                        `).join("")
+                        : "<p style='color:#999;'>No orders yet.</p>";
+                });
+        }
+
+        init();
+    </script>
+</body>
+</html>

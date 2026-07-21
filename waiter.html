@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Katina — Waiter</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #f4f5f7;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        header h1 { margin: 0; font-size: 20px; }
+        .bell {
+            background: #e74c3c;
+            border-radius: 50%;
+            padding: 4px 10px;
+            font-size: 13px;
+            display: none;
+        }
+        .container { padding: 20px; max-width: 900px; margin: 0 auto; }
+
+        .open-form {
+            background: white;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .open-form input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            margin-right: 8px;
+        }
+        button {
+            background: #2980b9;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button.danger { background: #e74c3c; }
+        button.success { background: #27ae60; }
+        button.secondary { background: #95a5a6; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+            border-left: 5px solid #bdc3c7;
+            transition: transform 0.1s;
+        }
+        .card:hover { transform: translateY(-2px); }
+        .card.has-pending { border-left-color: #e67e22; }
+        .card.paid { border-left-color: #27ae60; }
+        .card h3 { margin: 0 0 6px 0; }
+        .card .meta { font-size: 13px; color: #666; margin: 2px 0; }
+        .pill {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: #ecf0f1;
+            margin-top: 6px;
+        }
+        .pill.pending { background: #fdebd0; color: #b9770e; }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-top: 0; }
+        .order-line {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .order-line .info { font-size: 14px; }
+        .order-line .actions button { margin-left: 4px; font-size: 12px; padding: 5px 8px; }
+        .action-row { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .close-modal { float: right; cursor: pointer; font-size: 20px; color: #888; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🍽️ Katina — Waiter</h1>
+        <span class="bell" id="bell">🔔 <span id="bellCount">0</span> new</span>
+    </header>
+
+    <div class="container">
+
+        <div class="open-form">
+            <b>Open a New Table</b><br><br>
+            <input type="text" id="tableIdInput" placeholder="table id (e.g. T-1)">
+            <input type="number" id="partySizeInput" placeholder="party size" value="2" style="width:80px;">
+            <button onclick="openSession()">Open Table</button>
+            <p id="openResult"></p>
+        </div>
+
+        <h2>Tables (<span id="tableCount">0</span> open)</h2>
+        <div class="grid" id="tableGrid"></div>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <span class="close-modal" onclick="closeModal()">✕</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE = "http://127.0.0.1:8000";
+        let currentSessionId = null;
+        let lastPendingCount = 0;
+
+        function openSession() {
+            const tableId = document.getElementById("tableIdInput").value;
+            const partySize = document.getElementById("partySizeInput").value;
+            if (!tableId) return alert("Enter a table id");
+
+            fetch(`${BASE}/sessions/open?table_id=${tableId}&party_size=${partySize}`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("tableIdInput").value = "";
+                    document.getElementById("openResult").innerHTML =
+                        `Session opened! <a href="customer.html?session=${data.session_id}" target="_blank">Customer link</a>`;
+                    loadTables();
+                });
+        }
+
+        function loadTables() {
+            fetch(`${BASE}/sessions`)
+                .then(r => r.json())
+                .then(sessions => {
+                    document.getElementById("tableCount").innerText = sessions.length;
+
+                    const orderFetches = sessions.map(s =>
+                        fetch(`${BASE}/sessions/${s.session_id}/orders`).then(r => r.json())
+                    );
+
+                    Promise.all(orderFetches).then(allOrders => {
+                        const grid = document.getElementById("tableGrid");
+                        grid.innerHTML = "";
+
+                        let totalPending = 0;
+
+                        sessions.forEach((s, i) => {
+                            const orders = allOrders[i];
+                            const pending = orders.filter(o => o.status === "PENDING_REVIEW").length;
+                            const approved = orders.filter(o => o.status === "APPROVED").length;
+                            totalPending += pending;
+
+                            const cardClass = pending > 0 ? "has-pending" : (s.is_paid ? "paid" : "");
+
+                            grid.innerHTML += `
+                                <div class="card ${cardClass}" onclick="openTable('${s.session_id}')">
+                                    <h3>${s.table_id}</h3>
+                                    <div class="meta">👥 ${s.party_size} people</div>
+                                    <div class="meta">🧾 ${orders.length} orders (${approved} approved)</div>
+                                    <div class="meta">${s.is_paid ? "💰 Paid" : "❌ Unpaid"}</div>
+                                    ${pending > 0 ? `<span class="pill pending">${pending} pending</span>` : ""}
+                                </div>
+                            `;
+                        });
+
+                        const bell = document.getElementById("bell");
+                        if (totalPending > lastPendingCount) {
+                            bell.style.display = "inline-block";
+                        }
+                        if (totalPending === 0) bell.style.display = "none";
+                        document.getElementById("bellCount").innerText = totalPending;
+                        lastPendingCount = totalPending;
+
+                        if (currentSessionId) openTable(currentSessionId, true);
+                    });
+                });
+        }
+
+        function openTable(sessionId, silent) {
+            currentSessionId = sessionId;
+
+            Promise.all([
+                fetch(`${BASE}/sessions`).then(r => r.json()),
+                fetch(`${BASE}/sessions/${sessionId}/orders`).then(r => r.json())
+            ]).then(([sessions, orders]) => {
+                const session = sessions.find(s => s.session_id === sessionId);
+                const content = document.getElementById("modalContent");
+
+                if (!session) {
+                    content.innerHTML = "<p>This table was closed or removed.</p>";
+                    if (!silent) document.getElementById("overlay").style.display = "flex";
+                    return;
+                }
+
+                const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌" };
+
+                let ordersHtml = orders.length
+                    ? orders.map(o => `
+                        <div class="order-line">
+                            <div class="info">${statusEmoji[o.status] || ""} <b>${o.qty}x ${o.item}</b> — €${(o.price * o.qty).toFixed(2)}</div>
+                            <div class="actions">
+                                ${o.status === "PENDING_REVIEW" ? `
+                                    <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
+                                    <button class="danger" onclick="rejectOrder('${o.order_id}')">Reject</button>
+                                ` : `<span style="font-size:12px;color:#999;">${o.status}</span>`}
+                            </div>
+                        </div>
+                    `).join("")
+                    : "<p>No orders yet.</p>";
+
+                content.innerHTML = `
+                    <h2>${session.table_id}</h2>
+                    <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
+                    <p><small>Customer link: <a href="customer.html?session=${session.session_id}" target="_blank">open</a></small></p>
+                    <h3>Orders</h3>
+                    ${ordersHtml}
+                    <div class="action-row">
+                        <button class="secondary" onclick="calculateSplit()">Calculate Split</button>
+                        <button class="success" onclick="markPaid()">Mark Paid</button>
+                        <button onclick="closeSession()">Close Session</button>
+                        <button class="danger" onclick="deleteSession()">Delete Session</button>
+                        <button class="secondary" onclick="releaseTable('${session.table_id}')">Release Table</button>
+                    </div>
+                    <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                `;
+
+                if (!silent) document.getElementById("overlay").style.display = "flex";
+            });
+        }
+
+        function closeModal() {
+            document.getElementById("overlay").style.display = "none";
+            currentSessionId = null;
+        }
+
+        function approveOrder(orderId) {
+            fetch(`${BASE}/orders/${orderId}/approve`, { method: "POST" })
+                .then(r => r.json())
+                .then(() => { loadTables(); });
+        }
+
+        function rejectOrder(orderId) {
+            fetch(`${BASE}/orders/${orderId}/reject`, { method: "POST" })
+                .then(r => r.json())
+                .then(() => { loadTables(); });
+        }
+
+        function calculateSplit() {
+            fetch(`${BASE}/sessions/${currentSessionId}/split`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("modalResult").innerText =
+                        `Total: €${data.total} — €${data.per_person} per person (${data.party_size} people)`;
+                });
+        }
+
+        function markPaid() {
+            fetch(`${BASE}/sessions/${currentSessionId}/mark-paid`, { method: "POST" })
+                .then(r => r.json())
+                .then(() => { openTable(currentSessionId); loadTables(); });
+        }
+
+        function closeSession() {
+            fetch(`${BASE}/sessions/${currentSessionId}/close`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("modalResult").innerText = data.error || "Session closed.";
+                    loadTables();
+                });
+        }
+
+        function deleteSession() {
+            if (!confirm("Delete this session? This cancels all its orders.")) return;
+            fetch(`${BASE}/sessions/${currentSessionId}`, { method: "DELETE" })
+                .then(r => r.json())
+                .then(() => { closeModal(); loadTables(); });
+        }
+
+        function releaseTable(tableId) {
+            fetch(`${BASE}/tables/${tableId}/release`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("modalResult").innerText = data.error || "Table released.";
+                });
+        }
+
+        loadTables();
+        setInterval(loadTables, 5000);
+    </script>
+</body>
+</html>

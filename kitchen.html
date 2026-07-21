@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Katina — Kitchen</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
+        h1 { text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+        .ticket {
+            background: #2c2c2c;
+            border-left: 6px solid #e67e22;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .ticket h2 { margin: 0 0 8px 0; font-size: 28px; }
+        .ticket p { margin: 4px 0; color: #ccc; }
+        button {
+            margin-top: 10px;
+            background: #27ae60;
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Kitchen Display</h1>
+    <div class="grid" id="ticketGrid"></div>
+
+    <script>
+        const PDA = "http://127.0.0.1:8001";
+
+       function loadTickets() {
+    fetch(`${PDA}/kitchen-tickets`)
+        .then(r => r.json())
+        .then(tickets => {
+            console.log("Tickets received:", tickets);   // <-- add this line
+            const grid = document.getElementById("ticketGrid");
+                    grid.innerHTML = tickets.length
+                        ? tickets.map(t => `
+                            <div class="ticket">
+                                <h2>${t.qty}x ${t.item}</h2>
+                                <p>Order #${t.order_id}</p>
+                                <button onclick="markDone('${t.order_id}')">✅ Ready</button>
+                            </div>
+                        `).join("")
+                        : "<p style='color:#888;'>No active tickets.</p>";
+                });
+        }
+
+        function markDone(orderId) {
+            fetch(`${PDA}/kitchen-tickets/${orderId}/done`, { method: "POST" })
+                .then(() => loadTickets());
+        }
+
+        loadTickets();
+        setInterval(loadTickets, 3000);  // auto-refresh, same idea as the waiter page
+
+        </script>
+</body>
+</html>
