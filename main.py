@@ -52,6 +52,15 @@ def init_db():
             status TEXT
         )
     """)
+
+    # Migration: if "sessions" already existed from before this schema change,
+    # CREATE TABLE IF NOT EXISTS above did nothing — add the missing columns directly
+    for column_def in ["waiter_called INTEGER DEFAULT 0", "payment_requested INTEGER DEFAULT 0"]:
+        try:
+            conn.execute(f"ALTER TABLE sessions ADD COLUMN {column_def}")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
     conn.commit()
     conn.close()
 
