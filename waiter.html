@@ -134,6 +134,14 @@
     <div class="container">
 
         <div class="open-form">
+            <b>Register a New Table</b><br><br>
+            <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
+            <input type="text" id="newTableLabel" placeholder="display name (optional)">
+            <button onclick="registerTable()">Register Table</button>
+            <p id="registerResult"></p>
+        </div>
+
+        <div class="open-form">
             <b>Open a New Table</b><br><br>
             <input type="text" id="tableIdInput" placeholder="table id (e.g. T-1)">
             <input type="number" id="partySizeInput" placeholder="party size" value="2" style="width:80px;">
@@ -156,6 +164,21 @@
         const BASE = "https://katina-bot.onrender.com";
         let currentSessionId = null;
         let lastPendingCount = 0;
+
+        function registerTable() {
+            const tableId = document.getElementById("newTableId").value;
+            const label = document.getElementById("newTableLabel").value;
+            if (!tableId) return alert("Enter a table id");
+
+            fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("registerResult").innerText =
+                        data.error || `Table "${tableId}" registered.`;
+                    document.getElementById("newTableId").value = "";
+                    document.getElementById("newTableLabel").value = "";
+                });
+        }
 
         function openSession() {
             const tableId = document.getElementById("tableIdInput").value;
