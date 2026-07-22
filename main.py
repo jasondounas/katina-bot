@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import sqlite3
@@ -25,12 +25,21 @@ def get_connection():
 def init_db():
     conn = get_connection()
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS tables (
+            table_id TEXT PRIMARY KEY,
+            display_label TEXT,
+            active_session_id TEXT
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
             table_id TEXT,
             party_size INTEGER,
             status TEXT,
-            is_paid INTEGER DEFAULT 0
+            is_paid INTEGER DEFAULT 0,
+            waiter_called INTEGER DEFAULT 0,
+            payment_requested INTEGER DEFAULT 0
         )
     """)
     conn.execute("""
@@ -64,6 +73,75 @@ def get_menu():
         return {}
 
 
+# ---------- Tables (permanent) ----------
+
+@app.post("/tables")
+def create_table(table_id: str, display_label: str = None):
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
+    if cursor.fetchone():
+        conn.close()
+        return {"error": "Table already exists"}
+
+    conn.execute(
+        "INSERT INTO tables (table_id, display_label, active_session_id) VALUES (?, ?, NULL)",
+        (table_id, display_label or table_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"table_id": table_id, "display_label": display_label or table_id}
+
+
+@app.get("/tables")
+def list_tables():
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM tables")
+    tables = cursor.fetchall()
+    conn.close()
+    return [dict(t) for t in tables]
+
+
+@app.get("/tables/{table_id}/active-session")
+def get_active_session(table_id: str):
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
+    table = cursor.fetchone()
+    conn.close()
+
+    if table is None or table["active_session_id"] is None:
+        return {"active": False}
+    return {"active": True, "session_id": table["active_session_id"]}
+
+
+@app.post("/tables/{table_id}/release")
+def release_table(table_id: str):
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
+    table = cursor.fetchone()
+
+    if table is None:
+        conn.close()
+        return {"error": "Table not found"}
+
+    if table["active_session_id"] is None:
+        conn.close()
+        return {"error": "Table has no active session"}
+
+    cursor = conn.execute(
+        "SELECT * FROM sessions WHERE session_id = ?", (table["active_session_id"],)
+    )
+    session = cursor.fetchone()
+
+    if session and session["status"] not in ("CLOSED", "DELETED"):
+        conn.close()
+        return {"error": "Session must be closed before releasing the table"}
+
+    conn.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = ?", (table_id,))
+    conn.commit()
+    conn.close()
+    return {"table_id": table_id, "released": True}
+
+
 # ---------- Sessions ----------
 
 @app.get("/sessions")
@@ -72,19 +150,29 @@ def list_sessions(status: str = "OPEN"):
     cursor = conn.execute("SELECT * FROM sessions WHERE status = ?", (status,))
     sessions = cursor.fetchall()
     conn.close()
-
     return [dict(s) for s in sessions]
 
 
 @app.post("/sessions/open")
 def open_session(table_id: str, party_size: int):
-    session_id = f"s_{uuid.uuid4().hex[:8]}"
-
     conn = get_connection()
+    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
+    table = cursor.fetchone()
+
+    if table is None:
+        conn.close()
+        return {"error": "Table not found. Create it first with POST /tables"}
+
+    if table["active_session_id"] is not None:
+        conn.close()
+        return {"error": "Table already has an active session"}
+
+    session_id = f"s_{uuid.uuid4().hex[:8]}"
     conn.execute(
         "INSERT INTO sessions (session_id, table_id, party_size, status, is_paid) VALUES (?, ?, ?, ?, ?)",
         (session_id, table_id, party_size, "OPEN", 0),
     )
+    conn.execute("UPDATE tables SET active_session_id = ? WHERE table_id = ?", (session_id, table_id))
     conn.commit()
     conn.close()
 
@@ -95,21 +183,6 @@ def open_session(table_id: str, party_size: int):
         "status": "OPEN",
         "is_paid": False,
     }
-
-
-@app.get("/tables/{table_id}/active-session")
-def get_active_session(table_id: str):
-    conn = get_connection()
-    cursor = conn.execute(
-        "SELECT * FROM sessions WHERE table_id = ? AND status = 'OPEN' ORDER BY rowid DESC LIMIT 1",
-        (table_id,),
-    )
-    session = cursor.fetchone()
-    conn.close()
-
-    if session is None:
-        return {"active": False}
-    return {"active": True, "session_id": session["session_id"]}
 
 
 @app.post("/sessions/{session_id}/update-party-size")
@@ -212,7 +285,10 @@ def mark_paid(session_id: str):
         conn.close()
         return {"error": "Session not found"}
 
-    conn.execute("UPDATE sessions SET is_paid = 1 WHERE session_id = ?", (session_id,))
+    conn.execute(
+        "UPDATE sessions SET is_paid = 1, payment_requested = 0 WHERE session_id = ?",
+        (session_id,),
+    )
     conn.commit()
     conn.close()
 
@@ -242,6 +318,43 @@ def close_session(session_id: str):
     conn.close()
 
     return {"session_id": session_id, "status": "CLOSED"}
+
+
+@app.post("/sessions/{session_id}/call-waiter")
+def call_waiter(session_id: str):
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        return {"error": "Session not found"}
+
+    conn.execute("UPDATE sessions SET waiter_called = 1 WHERE session_id = ?", (session_id,))
+    conn.commit()
+    conn.close()
+    return {"session_id": session_id, "waiter_called": True}
+
+
+@app.post("/sessions/{session_id}/acknowledge-call")
+def acknowledge_call(session_id: str):
+    conn = get_connection()
+    conn.execute("UPDATE sessions SET waiter_called = 0 WHERE session_id = ?", (session_id,))
+    conn.commit()
+    conn.close()
+    return {"session_id": session_id, "waiter_called": False}
+
+
+@app.post("/sessions/{session_id}/request-payment")
+def request_payment(session_id: str):
+    conn = get_connection()
+    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        return {"error": "Session not found"}
+
+    conn.execute("UPDATE sessions SET payment_requested = 1 WHERE session_id = ?", (session_id,))
+    conn.commit()
+    conn.close()
+    return {"session_id": session_id, "payment_requested": True}
 
 
 # ---------- Orders ----------
@@ -380,26 +493,3 @@ def delete_order(order_id: str):
     conn.close()
 
     return {"order_id": order_id, "deleted": True}
-
-
-# ---------- Tables ----------
-
-@app.post("/tables/{table_id}/release")
-def release_table(table_id: str):
-    conn = get_connection()
-    cursor = conn.execute(
-        "SELECT * FROM sessions WHERE table_id = ? ORDER BY rowid DESC LIMIT 1",
-        (table_id,),
-    )
-    session = cursor.fetchone()
-
-    if session is None:
-        conn.close()
-        return {"error": "No session found for this table"}
-
-    if session["status"] not in ("CLOSED", "DELETED"):
-        conn.close()
-        return {"error": "Session must be closed before releasing the table"}
-
-    conn.close()
-    return {"table_id": table_id, "released": True}

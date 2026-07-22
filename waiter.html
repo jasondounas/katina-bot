@@ -56,6 +56,7 @@
         button.danger { background: #e74c3c; }
         button.success { background: #27ae60; }
         button.secondary { background: #95a5a6; }
+        button.warning { background: #f39c12; }
 
         .grid {
             display: grid;
@@ -73,6 +74,8 @@
         }
         .card:hover { transform: translateY(-2px); }
         .card.has-pending { border-left-color: #e67e22; }
+        .card.called { border-left-color: #f39c12; }
+        .card.wants-pay { border-left-color: #8e44ad; }
         .card.paid { border-left-color: #27ae60; }
         .card h3 { margin: 0 0 6px 0; }
         .card .meta { font-size: 13px; color: #666; margin: 2px 0; }
@@ -83,8 +86,11 @@
             border-radius: 20px;
             background: #ecf0f1;
             margin-top: 6px;
+            margin-right: 4px;
         }
         .pill.pending { background: #fdebd0; color: #b9770e; }
+        .pill.called { background: #fdebd0; color: #f39c12; }
+        .pill.pay { background: #f4ecf7; color: #8e44ad; }
 
         .overlay {
             display: none;
@@ -159,6 +165,10 @@
             fetch(`${BASE}/sessions/open?table_id=${tableId}&party_size=${partySize}`, { method: "POST" })
                 .then(r => r.json())
                 .then(data => {
+                    if (data.error) {
+                        document.getElementById("openResult").innerText = data.error;
+                        return;
+                    }
                     document.getElementById("tableIdInput").value = "";
                     document.getElementById("openResult").innerHTML =
                         `Session opened! <a href="customer.html?table=${tableId}" target="_blank">Customer link</a>`;
@@ -188,7 +198,16 @@
                             const approved = orders.filter(o => o.status === "APPROVED").length;
                             totalPending += pending;
 
-                            const cardClass = pending > 0 ? "has-pending" : (s.is_paid ? "paid" : "");
+                            let cardClass = "";
+                            if (pending > 0) cardClass = "has-pending";
+                            if (s.waiter_called) cardClass = "called";
+                            if (s.payment_requested) cardClass = "wants-pay";
+                            if (s.is_paid && !pending) cardClass = "paid";
+
+                            let badges = "";
+                            if (pending > 0) badges += `<span class="pill pending">${pending} pending</span>`;
+                            if (s.waiter_called) badges += `<span class="pill called">🔔 called</span>`;
+                            if (s.payment_requested) badges += `<span class="pill pay">💳 wants to pay</span>`;
 
                             grid.innerHTML += `
                                 <div class="card ${cardClass}" onclick="openTable('${s.session_id}')">
@@ -196,7 +215,7 @@
                                     <div class="meta">👥 ${s.party_size} people</div>
                                     <div class="meta">🧾 ${orders.length} orders (${approved} approved)</div>
                                     <div class="meta">${s.is_paid ? "💰 Paid" : "❌ Unpaid"}</div>
-                                    ${pending > 0 ? `<span class="pill pending">${pending} pending</span>` : ""}
+                                    ${badges}
                                 </div>
                             `;
                         });
@@ -246,10 +265,20 @@
                     `).join("")
                     : "<p>No orders yet.</p>";
 
+                let alerts = "";
+                if (session.waiter_called) {
+                    alerts += `<p style="color:#f39c12;">🔔 This table called for a waiter.
+                        <button class="secondary" onclick="acknowledgeCall()">Acknowledge</button></p>`;
+                }
+                if (session.payment_requested) {
+                    alerts += `<p style="color:#8e44ad;">💳 This table requested the bill.</p>`;
+                }
+
                 content.innerHTML = `
                     <h2>${session.table_id}</h2>
                     <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
                     <p><small>Customer link: <a href="customer.html?table=${session.table_id}" target="_blank">open</a></small></p>
+                    ${alerts}
                     <h3>Orders</h3>
                     ${ordersHtml}
                     <div class="action-row">
@@ -264,6 +293,11 @@
 
                 if (!silent) document.getElementById("overlay").style.display = "flex";
             });
+        }
+
+        function acknowledgeCall() {
+            fetch(`${BASE}/sessions/${currentSessionId}/acknowledge-call`, { method: "POST" })
+                .then(() => { openTable(currentSessionId); loadTables(); });
         }
 
         function closeModal() {
