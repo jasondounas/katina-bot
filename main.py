@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import sqlite3
@@ -12,6 +12,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+PDA_URL = "https://katina-bot-1.onrender.com"
 
 
 def get_connection():
@@ -56,13 +58,10 @@ def root():
 @app.get("/menu")
 def get_menu():
     try:
-        response = httpx.get("http://127.0.0.1:8001/menu", timeout=3.0)
+        response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
         return response.json()
     except httpx.RequestError:
         return {}
-    
-
-    
 
 
 # ---------- Sessions ----------
@@ -75,21 +74,6 @@ def list_sessions(status: str = "OPEN"):
     conn.close()
 
     return [dict(s) for s in sessions]
-
-
-@app.get("/tables/{table_id}/active-session")
-def get_active_session(table_id: str):
-    conn = get_connection()
-    cursor = conn.execute(
-        "SELECT * FROM sessions WHERE table_id = ? AND status = 'OPEN' ORDER BY rowid DESC LIMIT 1",
-        (table_id,),
-    )
-    session = cursor.fetchone()
-    conn.close()
-
-    if session is None:
-        return {"active": False}
-    return {"active": True, "session_id": session["session_id"]}
 
 
 @app.post("/sessions/open")
@@ -111,6 +95,21 @@ def open_session(table_id: str, party_size: int):
         "status": "OPEN",
         "is_paid": False,
     }
+
+
+@app.get("/tables/{table_id}/active-session")
+def get_active_session(table_id: str):
+    conn = get_connection()
+    cursor = conn.execute(
+        "SELECT * FROM sessions WHERE table_id = ? AND status = 'OPEN' ORDER BY rowid DESC LIMIT 1",
+        (table_id,),
+    )
+    session = cursor.fetchone()
+    conn.close()
+
+    if session is None:
+        return {"active": False}
+    return {"active": True, "session_id": session["session_id"]}
 
 
 @app.post("/sessions/{session_id}/update-party-size")
@@ -257,6 +256,16 @@ def get_pending_orders():
     return [dict(order) for order in orders]
 
 
+def get_price_from_pda(item: str) -> float:
+    try:
+        response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
+        menu = response.json()
+        return menu.get(item, 0)
+    except httpx.RequestError as e:
+        print(f"⚠ PDA unreachable while fetching menu — {e}")
+        return 0
+
+
 @app.post("/orders")
 def submit_order(session_id: str, item: str, qty: int):
     conn = get_connection()
@@ -287,23 +296,13 @@ def submit_order(session_id: str, item: str, qty: int):
     }
 
 
-def get_price_from_pda(item: str) -> float:
-    try:
-        response = httpx.get("http://127.0.0.1:8001/menu", timeout=3.0)
-        menu = response.json()
-        return menu.get(item, 0)
-    except httpx.RequestError as e:
-        print(f"⚠ PDA unreachable while fetching menu — {e}")
-        return 0
-
-
 def send_kitchen_ticket(order_id: str, item: str, qty: int) -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
-                "http://127.0.0.1:8001/kitchen-ticket",
+                f"{PDA_URL}/kitchen-ticket",
                 params={"order_id": order_id, "item": item, "qty": qty},
-                timeout=3.0,
+                timeout=5.0,
             )
             if response.status_code == 200:
                 return "SENT"
