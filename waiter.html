@@ -147,7 +147,7 @@
     </div>
 
     <script>
-      const BASE = "https://katina-bot.onrender.com";
+        const BASE = "https://katina-bot.onrender.com";
         let currentSessionId = null;
         let lastPendingCount = 0;
 
@@ -161,7 +161,7 @@
                 .then(data => {
                     document.getElementById("tableIdInput").value = "";
                     document.getElementById("openResult").innerHTML =
-                        `Session opened! <a href="customer.html?session=${data.session_id}" target="_blank">Customer link</a>`;
+                        `Session opened! <a href="customer.html?table=${tableId}" target="_blank">Customer link</a>`;
                     loadTables();
                 });
         }
@@ -249,7 +249,7 @@
                 content.innerHTML = `
                     <h2>${session.table_id}</h2>
                     <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
-                    <p><small>Customer link: <a href="customer.html?session=${session.session_id}" target="_blank">open</a></small></p>
+                    <p><small>Customer link: <a href="customer.html?table=${session.table_id}" target="_blank">open</a></small></p>
                     <h3>Orders</h3>
                     ${ordersHtml}
                     <div class="action-row">
