@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
-import sqlite3
+import os
+import psycopg2
+import psycopg2.extras
 import httpx
 
 app = FastAPI()
@@ -14,24 +16,30 @@ app.add_middleware(
 )
 
 PDA_URL = "https://katina-bot-1.onrender.com"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def get_connection():
-    conn = sqlite3.connect("katina.db")
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
+
+
+def get_cursor(conn):
+    # returns rows as dict-like objects, same convenience as sqlite3.Row gave us
+    return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
 def init_db():
     conn = get_connection()
-    conn.execute("""
+    cur = get_cursor(conn)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS tables (
             table_id TEXT PRIMARY KEY,
             display_label TEXT,
             active_session_id TEXT
         )
     """)
-    conn.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
             table_id TEXT,
@@ -42,7 +50,7 @@ def init_db():
             payment_requested INTEGER DEFAULT 0
         )
     """)
-    conn.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS orders (
             order_id TEXT PRIMARY KEY,
             session_id TEXT,
@@ -52,16 +60,17 @@ def init_db():
             status TEXT
         )
     """)
+    conn.commit()
 
-    # Migration: if "sessions" already existed from before this schema change,
-    # CREATE TABLE IF NOT EXISTS above did nothing — add the missing columns directly
+    # Migration: add any columns missing from an older version of "sessions"
     for column_def in ["waiter_called INTEGER DEFAULT 0", "payment_requested INTEGER DEFAULT 0"]:
         try:
-            conn.execute(f"ALTER TABLE sessions ADD COLUMN {column_def}")
-        except sqlite3.OperationalError:
-            pass  # column already exists
+            cur.execute(f"ALTER TABLE sessions ADD COLUMN {column_def}")
+            conn.commit()
+        except psycopg2.errors.DuplicateColumn:
+            conn.rollback()  # Postgres requires a rollback after a failed statement
 
-    conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -87,16 +96,19 @@ def get_menu():
 @app.post("/tables")
 def create_table(table_id: str, display_label: str = None):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
-    if cursor.fetchone():
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    if cur.fetchone():
+        cur.close()
         conn.close()
         return {"error": "Table already exists"}
 
-    conn.execute(
-        "INSERT INTO tables (table_id, display_label, active_session_id) VALUES (?, ?, NULL)",
+    cur.execute(
+        "INSERT INTO tables (table_id, display_label, active_session_id) VALUES (%s, %s, NULL)",
         (table_id, display_label or table_id),
     )
     conn.commit()
+    cur.close()
     conn.close()
     return {"table_id": table_id, "display_label": display_label or table_id}
 
@@ -104,8 +116,10 @@ def create_table(table_id: str, display_label: str = None):
 @app.get("/tables")
 def list_tables():
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM tables")
-    tables = cursor.fetchall()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables")
+    tables = cur.fetchall()
+    cur.close()
     conn.close()
     return [dict(t) for t in tables]
 
@@ -113,8 +127,10 @@ def list_tables():
 @app.get("/tables/{table_id}/active-session")
 def get_active_session(table_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
-    table = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    table = cur.fetchone()
+    cur.close()
     conn.close()
 
     if table is None or table["active_session_id"] is None:
@@ -125,28 +141,31 @@ def get_active_session(table_id: str):
 @app.post("/tables/{table_id}/release")
 def release_table(table_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
-    table = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    table = cur.fetchone()
 
     if table is None:
+        cur.close()
         conn.close()
         return {"error": "Table not found"}
 
     if table["active_session_id"] is None:
+        cur.close()
         conn.close()
         return {"error": "Table has no active session"}
 
-    cursor = conn.execute(
-        "SELECT * FROM sessions WHERE session_id = ?", (table["active_session_id"],)
-    )
-    session = cursor.fetchone()
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (table["active_session_id"],))
+    session = cur.fetchone()
 
     if session and session["status"] not in ("CLOSED", "DELETED"):
+        cur.close()
         conn.close()
         return {"error": "Session must be closed before releasing the table"}
 
-    conn.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = ?", (table_id,))
+    cur.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = %s", (table_id,))
     conn.commit()
+    cur.close()
     conn.close()
     return {"table_id": table_id, "released": True}
 
@@ -156,8 +175,10 @@ def release_table(table_id: str):
 @app.get("/sessions")
 def list_sessions(status: str = "OPEN"):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE status = ?", (status,))
-    sessions = cursor.fetchall()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE status = %s", (status,))
+    sessions = cur.fetchall()
+    cur.close()
     conn.close()
     return [dict(s) for s in sessions]
 
@@ -165,24 +186,28 @@ def list_sessions(status: str = "OPEN"):
 @app.post("/sessions/open")
 def open_session(table_id: str, party_size: int):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM tables WHERE table_id = ?", (table_id,))
-    table = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    table = cur.fetchone()
 
     if table is None:
+        cur.close()
         conn.close()
         return {"error": "Table not found. Create it first with POST /tables"}
 
     if table["active_session_id"] is not None:
+        cur.close()
         conn.close()
         return {"error": "Table already has an active session"}
 
     session_id = f"s_{uuid.uuid4().hex[:8]}"
-    conn.execute(
-        "INSERT INTO sessions (session_id, table_id, party_size, status, is_paid) VALUES (?, ?, ?, ?, ?)",
+    cur.execute(
+        "INSERT INTO sessions (session_id, table_id, party_size, status, is_paid) VALUES (%s, %s, %s, %s, %s)",
         (session_id, table_id, party_size, "OPEN", 0),
     )
-    conn.execute("UPDATE tables SET active_session_id = ? WHERE table_id = ?", (session_id, table_id))
+    cur.execute("UPDATE tables SET active_session_id = %s WHERE table_id = %s", (session_id, table_id))
     conn.commit()
+    cur.close()
     conn.close()
 
     return {
@@ -197,22 +222,26 @@ def open_session(table_id: str, party_size: int):
 @app.post("/sessions/{session_id}/update-party-size")
 def update_party_size(session_id: str, party_size: int):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
     if session["status"] != "OPEN":
+        cur.close()
         conn.close()
         return {"error": "Cannot update party size on a closed session"}
 
-    conn.execute(
-        "UPDATE sessions SET party_size = ? WHERE session_id = ?",
+    cur.execute(
+        "UPDATE sessions SET party_size = %s WHERE session_id = %s",
         (party_size, session_id),
     )
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"session_id": session_id, "party_size": party_size}
@@ -221,24 +250,27 @@ def update_party_size(session_id: str, party_size: int):
 @app.delete("/sessions/{session_id}")
 def delete_session(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
     if session["status"] != "OPEN":
+        cur.close()
         conn.close()
         return {"error": "Session already closed or deleted"}
 
-    conn.execute("UPDATE sessions SET status = ? WHERE session_id = ?", ("DELETED", session_id))
-    conn.execute(
-        "UPDATE orders SET status = 'CANCELLED' WHERE session_id = ? AND status != 'CANCELLED'",
+    cur.execute("UPDATE sessions SET status = %s WHERE session_id = %s", ("DELETED", session_id))
+    cur.execute(
+        "UPDATE orders SET status = 'CANCELLED' WHERE session_id = %s AND status != 'CANCELLED'",
         (session_id,),
     )
-
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"session_id": session_id, "status": "DELETED"}
@@ -247,8 +279,10 @@ def delete_session(session_id: str):
 @app.get("/sessions/{session_id}/orders")
 def get_session_orders(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM orders WHERE session_id = ?", (session_id,))
-    orders = cursor.fetchall()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE session_id = %s", (session_id,))
+    orders = cur.fetchall()
+    cur.close()
     conn.close()
 
     return [dict(order) for order in orders]
@@ -257,19 +291,22 @@ def get_session_orders(session_id: str):
 @app.post("/sessions/{session_id}/split")
 def calculate_split(session_id: str):
     conn = get_connection()
+    cur = get_cursor(conn)
 
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
-    cursor = conn.execute(
-        "SELECT * FROM orders WHERE session_id = ? AND status = 'APPROVED'",
+    cur.execute(
+        "SELECT * FROM orders WHERE session_id = %s AND status = 'APPROVED'",
         (session_id,),
     )
-    approved_orders = cursor.fetchall()
+    approved_orders = cur.fetchall()
+    cur.close()
     conn.close()
 
     total = sum(order["price"] * order["qty"] for order in approved_orders)
@@ -287,18 +324,21 @@ def calculate_split(session_id: str):
 @app.post("/sessions/{session_id}/mark-paid")
 def mark_paid(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
-    conn.execute(
-        "UPDATE sessions SET is_paid = 1, payment_requested = 0 WHERE session_id = ?",
+    cur.execute(
+        "UPDATE sessions SET is_paid = 1, payment_requested = 0 WHERE session_id = %s",
         (session_id,),
     )
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"session_id": session_id, "is_paid": True}
@@ -307,23 +347,28 @@ def mark_paid(session_id: str):
 @app.post("/sessions/{session_id}/close")
 def close_session(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
     if session["status"] != "OPEN":
+        cur.close()
         conn.close()
         return {"error": "Session is not open"}
 
     if not session["is_paid"]:
+        cur.close()
         conn.close()
         return {"error": "Cannot close, payment not received"}
 
-    conn.execute("UPDATE sessions SET status = ? WHERE session_id = ?", ("CLOSED", session_id))
+    cur.execute("UPDATE sessions SET status = %s WHERE session_id = %s", ("CLOSED", session_id))
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"session_id": session_id, "status": "CLOSED"}
@@ -332,13 +377,16 @@ def close_session(session_id: str):
 @app.post("/sessions/{session_id}/call-waiter")
 def call_waiter(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    if cursor.fetchone() is None:
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    if cur.fetchone() is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
-    conn.execute("UPDATE sessions SET waiter_called = 1 WHERE session_id = ?", (session_id,))
+    cur.execute("UPDATE sessions SET waiter_called = 1 WHERE session_id = %s", (session_id,))
     conn.commit()
+    cur.close()
     conn.close()
     return {"session_id": session_id, "waiter_called": True}
 
@@ -346,8 +394,10 @@ def call_waiter(session_id: str):
 @app.post("/sessions/{session_id}/acknowledge-call")
 def acknowledge_call(session_id: str):
     conn = get_connection()
-    conn.execute("UPDATE sessions SET waiter_called = 0 WHERE session_id = ?", (session_id,))
+    cur = get_cursor(conn)
+    cur.execute("UPDATE sessions SET waiter_called = 0 WHERE session_id = %s", (session_id,))
     conn.commit()
+    cur.close()
     conn.close()
     return {"session_id": session_id, "waiter_called": False}
 
@@ -355,13 +405,16 @@ def acknowledge_call(session_id: str):
 @app.post("/sessions/{session_id}/request-payment")
 def request_payment(session_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    if cursor.fetchone() is None:
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    if cur.fetchone() is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
-    conn.execute("UPDATE sessions SET payment_requested = 1 WHERE session_id = ?", (session_id,))
+    cur.execute("UPDATE sessions SET payment_requested = 1 WHERE session_id = %s", (session_id,))
     conn.commit()
+    cur.close()
     conn.close()
     return {"session_id": session_id, "payment_requested": True}
 
@@ -371,8 +424,10 @@ def request_payment(session_id: str):
 @app.get("/orders/pending")
 def get_pending_orders():
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM orders WHERE status = 'PENDING_REVIEW'")
-    orders = cursor.fetchall()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE status = 'PENDING_REVIEW'")
+    orders = cur.fetchall()
+    cur.close()
     conn.close()
 
     return [dict(order) for order in orders]
@@ -391,21 +446,24 @@ def get_price_from_pda(item: str) -> float:
 @app.post("/orders")
 def submit_order(session_id: str, item: str, qty: int):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
-    session = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
 
     if session is None:
+        cur.close()
         conn.close()
         return {"error": "Session not found"}
 
     price = get_price_from_pda(item)
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
-    conn.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status) VALUES (?, ?, ?, ?, ?, ?)",
+    cur.execute(
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status) VALUES (%s, %s, %s, %s, %s, %s)",
         (order_id, session_id, item, qty, price, "PENDING_REVIEW"),
     )
     conn.commit()
+    cur.close()
     conn.close()
 
     return {
@@ -438,21 +496,25 @@ def send_kitchen_ticket(order_id: str, item: str, qty: int) -> str:
 @app.post("/orders/{order_id}/approve")
 def approve_order(order_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,))
-    order = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
 
     if order is None:
+        cur.close()
         conn.close()
         return {"error": "Order not found"}
 
     if order["status"] != "PENDING_REVIEW":
+        cur.close()
         conn.close()
         return {"error": "Order already processed"}
 
     kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"])
 
-    conn.execute("UPDATE orders SET status = ? WHERE order_id = ?", ("APPROVED", order_id))
+    cur.execute("UPDATE orders SET status = %s WHERE order_id = %s", ("APPROVED", order_id))
     conn.commit()
+    cur.close()
     conn.close()
 
     return {
@@ -465,19 +527,23 @@ def approve_order(order_id: str):
 @app.post("/orders/{order_id}/reject")
 def reject_order(order_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,))
-    order = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
 
     if order is None:
+        cur.close()
         conn.close()
         return {"error": "Order not found"}
 
     if order["status"] != "PENDING_REVIEW":
+        cur.close()
         conn.close()
         return {"error": "Order already processed"}
 
-    conn.execute("UPDATE orders SET status = ? WHERE order_id = ?", ("REJECTED", order_id))
+    cur.execute("UPDATE orders SET status = %s WHERE order_id = %s", ("REJECTED", order_id))
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"order_id": order_id, "status": "REJECTED"}
@@ -486,19 +552,23 @@ def reject_order(order_id: str):
 @app.delete("/orders/{order_id}")
 def delete_order(order_id: str):
     conn = get_connection()
-    cursor = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,))
-    order = cursor.fetchone()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
 
     if order is None:
+        cur.close()
         conn.close()
         return {"error": "Order not found"}
 
     if order["status"] != "PENDING_REVIEW":
+        cur.close()
         conn.close()
         return {"error": "Order already processed"}
 
-    conn.execute("DELETE FROM orders WHERE order_id = ?", (order_id,))
+    cur.execute("DELETE FROM orders WHERE order_id = %s", (order_id,))
     conn.commit()
+    cur.close()
     conn.close()
 
     return {"order_id": order_id, "deleted": True}
