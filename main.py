@@ -77,6 +77,20 @@ def init_db():
 init_db()
 
 
+@app.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if session is None:
+        return {"error": "Session not found"}
+    return dict(session)
+
+
 @app.get("/")
 def root():
     return {"status": "alive"}
