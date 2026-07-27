@@ -20,7 +20,7 @@
             align-items: center;
             position: sticky;
             top: 0;
-            z-index: 30;
+            z-index: 10;
         }
         .brand { display: flex; align-items: center; gap: 14px; }
         .logo {
@@ -33,8 +33,6 @@
         }
         header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
 
-        /* Notification bell — a real clickable button with a dropdown panel */
-        .bell-wrap { position: relative; }
         .bell-btn {
             background: rgba(255,255,255,0.1);
             border: none;
@@ -57,29 +55,56 @@
         }
         .bell-btn.active .bell-count { background: rgba(255,255,255,0.3); }
 
-        .notif-panel {
+        .drawer-overlay {
             display: none;
-            position: absolute;
-            top: 56px; right: 0;
-            background: white;
-            border-radius: 18px;
-            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
-            width: 320px;
-            max-height: 400px;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 40;
+        }
+        .drawer-overlay.open { display: block; }
+
+        .notif-drawer {
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: 340px;
+            max-width: 88vw;
+            background: linear-gradient(180deg, #1a1a1a, #2d2d2d);
+            box-shadow: -12px 0 32px rgba(0,0,0,0.3);
+            z-index: 41;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+            padding: 24px;
             overflow-y: auto;
-            padding: 8px;
-            z-index: 30;
         }
-        .notif-panel.open { display: block; }
-        .notif-empty { padding: 30px 20px; text-align: center; color: #aaa; font-size: 14px; }
+        .notif-drawer.open { transform: translateX(0); }
+
+        .drawer-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .drawer-header h2 { color: white; font-size: 20px; font-weight: 800; }
+        .drawer-close {
+            color: #999; font-size: 24px; cursor: pointer;
+            background: rgba(255,255,255,0.08);
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .notif-empty {
+            padding: 40px 10px; text-align: center; color: #666; font-size: 14px;
+        }
         .notif-row {
+            background: rgba(255,255,255,0.06);
             display: flex; align-items: center; justify-content: space-between;
-            padding: 14px; border-radius: 12px; cursor: pointer;
+            padding: 16px; border-radius: 14px; cursor: pointer;
+            margin-bottom: 10px;
+            transition: background 0.15s;
         }
-        .notif-row:hover { background: #f7f5f2; }
-        .notif-row .info { font-size: 14px; }
-        .notif-row .table-name { font-weight: 800; }
-        .notif-row .type { font-size: 12px; color: #777; margin-top: 2px; }
+        .notif-row:hover { background: rgba(255,255,255,0.12); }
+        .notif-row .info { color: white; }
+        .notif-row .table-name { font-weight: 800; font-size: 15px; }
+        .notif-row .type { font-size: 12.5px; color: #ff9d70; margin-top: 3px; }
         .notif-row .go { font-size: 18px; color: #ff6b35; }
 
         .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
@@ -105,7 +130,6 @@
             gap: 16px;
         }
 
-        /* Add-table tile — matches the card grid, dashed border */
         .add-tile {
             border: 2.5px dashed #ddd;
             border-radius: 20px;
@@ -131,7 +155,6 @@
         }
         .card:hover { transform: translateY(-3px); }
 
-        /* Alert banner — full-width colored strip at the top of the card, unmissable */
         .card-alert {
             padding: 10px 16px;
             font-size: 12.5px;
@@ -230,16 +253,21 @@
             <div class="logo">🍽️</div>
             <h1>Katina — Waiter</h1>
         </div>
-        <div class="bell-wrap">
-            <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
-                🔔 <span class="bell-count" id="bellCount">0</span>
-            </button>
-            <div class="notif-panel" id="notifPanel"></div>
-        </div>
+        <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
+            🔔 <span class="bell-count" id="bellCount">0</span>
+        </button>
     </header>
 
-    <div class="container">
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeNotifPanel()"></div>
+    <div class="notif-drawer" id="notifDrawer">
+        <div class="drawer-header">
+            <h2>🔔 Notifications</h2>
+            <span class="drawer-close" onclick="closeNotifPanel()">✕</span>
+        </div>
+        <div id="notifList"></div>
+    </div>
 
+    <div class="container">
         <div class="section-title">
             <span class="bar"></span>Tables
             <span class="count-badge" id="tableCount">0</span>
@@ -258,8 +286,6 @@
         const BASE = "https://katina-bot.onrender.com";
         let currentTableId = null;
         let currentAlerts = [];
-
-        // ---------- Add Table (now a modal, triggered by the dashed tile) ----------
 
         function openAddTableModal() {
             currentTableId = null;
@@ -293,24 +319,31 @@
                 });
         }
 
-        // ---------- Notification panel ----------
-
         function toggleNotifPanel() {
-            const panel = document.getElementById("notifPanel");
+            const drawer = document.getElementById("notifDrawer");
+            const overlay = document.getElementById("drawerOverlay");
             const btn = document.getElementById("bellBtn");
-            const isOpen = panel.classList.contains("open");
-            panel.classList.toggle("open", !isOpen);
+            const isOpen = drawer.classList.contains("open");
+
+            drawer.classList.toggle("open", !isOpen);
+            overlay.classList.toggle("open", !isOpen);
             btn.classList.toggle("active", !isOpen);
             if (!isOpen) renderNotifPanel();
         }
 
+        function closeNotifPanel() {
+            document.getElementById("notifDrawer").classList.remove("open");
+            document.getElementById("drawerOverlay").classList.remove("open");
+            document.getElementById("bellBtn").classList.remove("active");
+        }
+
         function renderNotifPanel() {
-            const panel = document.getElementById("notifPanel");
+            const list = document.getElementById("notifList");
             if (currentAlerts.length === 0) {
-                panel.innerHTML = `<div class="notif-empty">No active alerts 🎉</div>`;
+                list.innerHTML = `<div class="notif-empty">No active alerts 🎉</div>`;
                 return;
             }
-            panel.innerHTML = currentAlerts.map(a => `
+            list.innerHTML = currentAlerts.map(a => `
                 <div class="notif-row" onclick="jumpToTable('${a.tableId}')">
                     <div class="info">
                         <div class="table-name">${a.label}</div>
@@ -322,12 +355,9 @@
         }
 
         function jumpToTable(tableId) {
-            document.getElementById("notifPanel").classList.remove("open");
-            document.getElementById("bellBtn").classList.remove("active");
+            closeNotifPanel();
             openTableModal(tableId);
         }
-
-        // ---------- Tables grid ----------
 
         function loadTables() {
             Promise.all([
@@ -397,7 +427,6 @@
 
                         const pending = pendingCountBySession[session.session_id] || 0;
 
-                        // Priority order for the banner: called > wants pay > pending
                         let bannerClass = "";
                         let bannerText = "";
                         if (session.waiter_called) {
@@ -433,7 +462,7 @@
                     });
 
                     document.getElementById("bellCount").innerText = currentAlerts.length;
-                    if (document.getElementById("notifPanel").classList.contains("open")) renderNotifPanel();
+                    if (document.getElementById("notifDrawer").classList.contains("open")) renderNotifPanel();
 
                     if (currentTableId) openTableModal(currentTableId, true);
                 });
