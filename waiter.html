@@ -76,6 +76,7 @@
         .card.has-pending { border-left-color: #e67e22; }
         .card.called { border-left-color: #f39c12; }
         .card.wants-pay { border-left-color: #8e44ad; }
+        .card.needs-release { border-left-color: #7f8c8d; }
         .card h3 { margin: 0 0 6px 0; }
         .card .meta { font-size: 13px; color: #666; margin: 2px 0; }
         .pill {
@@ -90,6 +91,7 @@
         .pill.pending { background: #fdebd0; color: #b9770e; }
         .pill.called { background: #fdebd0; color: #f39c12; }
         .pill.pay { background: #f4ecf7; color: #8e44ad; }
+        .pill.release { background: #ecf0f1; color: #555; }
 
         .overlay {
             display: none;
@@ -171,66 +173,95 @@
                 });
         }
 
+        // ---------- Single source of truth: table.active_session_id + GET /sessions/{id} ----------
+
         function loadTables() {
             Promise.all([
                 fetch(`${BASE}/tables`).then(r => r.json()),
-                fetch(`${BASE}/sessions`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
-            ]).then(([tables, sessions, pendingOrders]) => {
-
-                const sessionByTableId = {};
-                sessions.forEach(s => { sessionByTableId[s.table_id] = s; });
+            ]).then(([tables, pendingOrders]) => {
 
                 const pendingCountBySession = {};
                 pendingOrders.forEach(o => {
                     pendingCountBySession[o.session_id] = (pendingCountBySession[o.session_id] || 0) + 1;
                 });
 
-                const grid = document.getElementById("tableGrid");
-                grid.innerHTML = "";
-                let totalPending = 0;
+                // For every table that has an active_session_id, fetch that
+                // exact session directly — regardless of its status. This is
+                // the fix: we never rely on the filtered "open sessions" list
+                // to decide what a table's card should look like.
+                const sessionFetches = tables
+                    .filter(t => t.active_session_id)
+                    .map(t =>
+                        fetch(`${BASE}/sessions/${t.active_session_id}`)
+                            .then(r => r.json())
+                            .then(session => ({ table_id: t.table_id, session }))
+                    );
 
-                tables.forEach(t => {
-                    const session = sessionByTableId[t.table_id];
+                Promise.all(sessionFetches).then(results => {
+                    const sessionByTableId = {};
+                    results.forEach(r => {
+                        if (!r.session.error) sessionByTableId[r.table_id] = r.session;
+                    });
 
-                    if (!session) {
+                    const grid = document.getElementById("tableGrid");
+                    grid.innerHTML = "";
+                    let totalPending = 0;
+
+                    tables.forEach(t => {
+                        const session = sessionByTableId[t.table_id];
+
+                        if (!session) {
+                            grid.innerHTML += `
+                                <div class="card empty" onclick="openTableModal('${t.table_id}')">
+                                    <h3>${t.display_label || t.table_id}</h3>
+                                    <div class="meta">🟢 Empty</div>
+                                </div>
+                            `;
+                            return;
+                        }
+
+                        if (session.status !== "OPEN") {
+                            // Session was closed/deleted but the table was never released
+                            grid.innerHTML += `
+                                <div class="card needs-release" onclick="openTableModal('${t.table_id}')">
+                                    <h3>${t.display_label || t.table_id}</h3>
+                                    <div class="meta">⏹️ Session ${session.status.toLowerCase()}</div>
+                                    <span class="pill release">Needs release</span>
+                                </div>
+                            `;
+                            return;
+                        }
+
+                        const pending = pendingCountBySession[session.session_id] || 0;
+                        totalPending += pending;
+
+                        let cardClass = "";
+                        if (pending > 0) cardClass = "has-pending";
+                        if (session.waiter_called) cardClass = "called";
+                        if (session.payment_requested) cardClass = "wants-pay";
+
+                        let badges = "";
+                        if (pending > 0) badges += `<span class="pill pending">${pending} pending</span>`;
+                        if (session.waiter_called) badges += `<span class="pill called">🔔 called</span>`;
+                        if (session.payment_requested) badges += `<span class="pill pay">💳 wants to pay</span>`;
+
                         grid.innerHTML += `
-                            <div class="card empty" onclick="openTableModal('${t.table_id}')">
+                            <div class="card ${cardClass}" onclick="openTableModal('${t.table_id}')">
                                 <h3>${t.display_label || t.table_id}</h3>
-                                <div class="meta">🟢 Empty</div>
+                                <div class="meta">👥 ${session.party_size} people</div>
+                                <div class="meta">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</div>
+                                ${badges}
                             </div>
                         `;
-                        return;
-                    }
+                    });
 
-                    const pending = pendingCountBySession[session.session_id] || 0;
-                    totalPending += pending;
+                    const bell = document.getElementById("bell");
+                    bell.style.display = totalPending > 0 ? "inline-block" : "none";
+                    document.getElementById("bellCount").innerText = totalPending;
 
-                    let cardClass = "";
-                    if (pending > 0) cardClass = "has-pending";
-                    if (session.waiter_called) cardClass = "called";
-                    if (session.payment_requested) cardClass = "wants-pay";
-
-                    let badges = "";
-                    if (pending > 0) badges += `<span class="pill pending">${pending} pending</span>`;
-                    if (session.waiter_called) badges += `<span class="pill called">🔔 called</span>`;
-                    if (session.payment_requested) badges += `<span class="pill pay">💳 wants to pay</span>`;
-
-                    grid.innerHTML += `
-                        <div class="card ${cardClass}" onclick="openTableModal('${t.table_id}')">
-                            <h3>${t.display_label || t.table_id}</h3>
-                            <div class="meta">👥 ${session.party_size} people</div>
-                            <div class="meta">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</div>
-                            ${badges}
-                        </div>
-                    `;
+                    if (currentTableId) openTableModal(currentTableId, true);
                 });
-
-                const bell = document.getElementById("bell");
-                bell.style.display = totalPending > 0 ? "inline-block" : "none";
-                document.getElementById("bellCount").innerText = totalPending;
-
-                if (currentTableId) openTableModal(currentTableId, true);
             });
         }
 
@@ -238,13 +269,13 @@
             currentTableId = tableId;
             const content = document.getElementById("modalContent");
 
-            fetch(`${BASE}/sessions`)
+            fetch(`${BASE}/tables`)
                 .then(r => r.json())
-                .then(sessions => {
-                    const session = sessions.find(s => s.table_id === tableId);
+                .then(tables => {
+                    const table = tables.find(t => t.table_id === tableId);
 
-                    if (!session) {
-                        // No active session — offer to open one
+                    if (!table || !table.active_session_id) {
+                        // Empty — offer to open a session
                         content.innerHTML = `
                             <h2>${tableId}</h2>
                             <p style="color:#27ae60;">🟢 This table is currently empty.</p>
@@ -256,53 +287,67 @@
                         return;
                     }
 
-                    // Has an active session — show full detail view
-                    fetch(`${BASE}/sessions/${session.session_id}/orders`)
+                    fetch(`${BASE}/sessions/${table.active_session_id}`)
                         .then(r => r.json())
-                        .then(orders => {
-                            const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌" };
-
-                            let ordersHtml = orders.length
-                                ? orders.map(o => `
-                                    <div class="order-line">
-                                        <div class="info">${statusEmoji[o.status] || ""} <b>${o.qty}x ${o.item}</b> — €${(o.price * o.qty).toFixed(2)}</div>
-                                        <div class="actions">
-                                            ${o.status === "PENDING_REVIEW" ? `
-                                                <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
-                                                <button class="danger" onclick="rejectOrder('${o.order_id}')">Reject</button>
-                                            ` : `<span style="font-size:12px;color:#999;">${o.status}</span>`}
-                                        </div>
-                                    </div>
-                                `).join("")
-                                : "<p>No orders yet.</p>";
-
-                            let alerts = "";
-                            if (session.waiter_called) {
-                                alerts += `<p style="color:#f39c12;">🔔 This table called for a waiter.
-                                    <button class="secondary" onclick="acknowledgeCall()">Acknowledge</button></p>`;
-                            }
-                            if (session.payment_requested) {
-                                alerts += `<p style="color:#8e44ad;">💳 This table requested the bill.</p>`;
-                            }
-
-                            content.innerHTML = `
-                                <h2>${tableId}</h2>
-                                <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
-                                <p><small>Customer link: <a href="customer.html?table=${tableId}" target="_blank">open</a></small></p>
-                                ${alerts}
-                                <h3>Orders</h3>
-                                ${ordersHtml}
-                                <div class="action-row">
-                                    <button class="secondary" onclick="calculateSplit('${session.session_id}')">Calculate Split</button>
-                                    <button class="success" onclick="markPaid('${session.session_id}')">Mark Paid</button>
-                                    <button onclick="closeSession('${session.session_id}')">Close Session</button>
-                                    <button class="danger" onclick="deleteSession('${session.session_id}')">Delete Session</button>
+                        .then(session => {
+                            if (session.error || session.status !== "OPEN") {
+                                // Session exists but is closed/deleted — table just needs releasing
+                                content.innerHTML = `
+                                    <h2>${tableId}</h2>
+                                    <p style="color:#7f8c8d;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
-                                </div>
-                                <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
-                            `;
+                                    <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                                `;
+                                if (!silent) document.getElementById("overlay").style.display = "flex";
+                                return;
+                            }
 
-                            if (!silent) document.getElementById("overlay").style.display = "flex";
+                            fetch(`${BASE}/sessions/${session.session_id}/orders`)
+                                .then(r => r.json())
+                                .then(orders => {
+                                    const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌" };
+
+                                    let ordersHtml = orders.length
+                                        ? orders.map(o => `
+                                            <div class="order-line">
+                                                <div class="info">${statusEmoji[o.status] || ""} <b>${o.qty}x ${o.item}</b> — €${(o.price * o.qty).toFixed(2)}</div>
+                                                <div class="actions">
+                                                    ${o.status === "PENDING_REVIEW" ? `
+                                                        <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
+                                                        <button class="danger" onclick="rejectOrder('${o.order_id}')">Reject</button>
+                                                    ` : `<span style="font-size:12px;color:#999;">${o.status}</span>`}
+                                                </div>
+                                            </div>
+                                        `).join("")
+                                        : "<p>No orders yet.</p>";
+
+                                    let alerts = "";
+                                    if (session.waiter_called) {
+                                        alerts += `<p style="color:#f39c12;">🔔 This table called for a waiter.
+                                            <button class="secondary" onclick="acknowledgeCall()">Acknowledge</button></p>`;
+                                    }
+                                    if (session.payment_requested) {
+                                        alerts += `<p style="color:#8e44ad;">💳 This table requested the bill.</p>`;
+                                    }
+
+                                    content.innerHTML = `
+                                        <h2>${tableId}</h2>
+                                        <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
+                                        <p><small>Customer link: <a href="customer.html?table=${tableId}" target="_blank">open</a></small></p>
+                                        ${alerts}
+                                        <h3>Orders</h3>
+                                        ${ordersHtml}
+                                        <div class="action-row">
+                                            <button class="secondary" onclick="calculateSplit('${session.session_id}')">Calculate Split</button>
+                                            <button class="success" onclick="markPaid('${session.session_id}')">Mark Paid</button>
+                                            <button onclick="closeSession('${session.session_id}')">Close Session</button>
+                                            <button class="danger" onclick="deleteSession('${session.session_id}')">Delete Session</button>
+                                        </div>
+                                        <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                                    `;
+
+                                    if (!silent) document.getElementById("overlay").style.display = "flex";
+                                });
                         });
                 });
         }
@@ -328,13 +373,12 @@
         }
 
         function acknowledgeCall() {
-            const sessions = document.getElementById("modalContent"); // just trigger refresh
-            fetch(`${BASE}/sessions`)
+            fetch(`${BASE}/tables`)
                 .then(r => r.json())
-                .then(sessions => {
-                    const session = sessions.find(s => s.table_id === currentTableId);
-                    if (!session) return;
-                    fetch(`${BASE}/sessions/${session.session_id}/acknowledge-call`, { method: "POST" })
+                .then(tables => {
+                    const table = tables.find(t => t.table_id === currentTableId);
+                    if (!table || !table.active_session_id) return;
+                    fetch(`${BASE}/sessions/${table.active_session_id}/acknowledge-call`, { method: "POST" })
                         .then(() => { openTableModal(currentTableId); loadTables(); });
                 });
         }
@@ -370,7 +414,8 @@
             fetch(`${BASE}/sessions/${sessionId}/close`, { method: "POST" })
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById("modalResult").innerText = data.error || "Session closed.";
+                    document.getElementById("modalResult").innerText = data.error || "Session closed. You can release the table now.";
+                    openTableModal(currentTableId);
                     loadTables();
                 });
         }
@@ -379,14 +424,18 @@
             if (!confirm("Delete this session? This cancels all its orders.")) return;
             fetch(`${BASE}/sessions/${sessionId}`, { method: "DELETE" })
                 .then(r => r.json())
-                .then(() => { closeModal(); loadTables(); });
+                .then(() => { openTableModal(currentTableId); loadTables(); });
         }
 
         function releaseTable(tableId) {
             fetch(`${BASE}/tables/${tableId}/release`, { method: "POST" })
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById("modalResult").innerText = data.error || "Table released.";
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    closeModal();
                     loadTables();
                 });
         }
