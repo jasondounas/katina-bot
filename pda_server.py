@@ -11,9 +11,21 @@ app.add_middleware(
 )
 
 MENU = {
-    "coke": {"price": 3.50, "image": "https://katina-bot-2.onrender.com/image/coke.jpg"},
-    "burger": {"price": 9.90, "image": "https://katina-bot-2.onrender.com/image/burger.jpg"},
-    "salad": {"price": 7.20, "image": "https://katina-bot-2.onrender.com/image/salad.jpg"},
+    "coke": {
+        "price": 3.50,
+        "image": "https://katina-bot-2.onrender.com/images/coke.jpg",
+        "description": "Ice-cold classic, served in a chilled glass"
+    },
+    "burger": {
+        "price": 9.90,
+        "image": "https://katina-bot-2.onrender.com/images/burger.jpg",
+        "description": "Juicy beef patty, cheddar, house sauce, brioche bun"
+    },
+    "salad": {
+        "price": 7.20,
+        "image": "https://katina-bot-2.onrender.com/images/salad.jpg",
+        "description": "Crisp greens, feta, olives, house vinaigrette"
+    },
 }
 
 kitchen_tickets = []

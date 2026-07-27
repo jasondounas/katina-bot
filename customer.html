@@ -17,7 +17,10 @@
             padding: 28px 24px 20px;
             color: white;
         }
-        header .brand { display: flex; align-items: center; gap: 14px; }
+        header .brand {
+            display: flex; align-items: center; gap: 14px;
+            max-width: 900px; margin: 0 auto;
+        }
         header .logo {
             width: 52px; height: 52px;
             background: linear-gradient(135deg, #ff6b35, #f7931e);
@@ -29,7 +32,6 @@
         header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
         header .sub { font-size: 14px; color: #ffb088; margin-top: 3px; font-weight: 600; }
 
-        /* Decorative hero banner — pure CSS pattern, no image files to break */
         .hero {
             background: linear-gradient(135deg, #2a9d8f, #1d7d72);
             background-image:
@@ -43,6 +45,7 @@
             color: white;
             box-shadow: 0 4px 20px rgba(29,125,114,0.25);
         }
+        .hero-inner { max-width: 900px; margin: 0 auto; }
         .hero .tagline { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
         .hero .tagline-sub { font-size: 13px; color: #b8e8e2; font-weight: 500; }
 
@@ -69,6 +72,8 @@
         }
         .section-title.orders .bar { background: #2a9d8f; }
 
+        .menu-grid { display: block; }
+
         .menu-item {
             background: white;
             border-radius: 22px;
@@ -93,7 +98,15 @@
             font-size: 32px;
         }
         .item-info { flex: 1; min-width: 0; }
-        .menu-item .name { font-weight: 700; font-size: 17px; margin-bottom: 5px; }
+        .menu-item .name { font-weight: 700; font-size: 17px; margin-bottom: 3px; }
+        .menu-item .description {
+            font-size: 12.5px; color: #999; line-height: 1.4;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
         .menu-item .price { color: #ff6b35; font-weight: 800; font-size: 16px; }
         .menu-item .add-btn {
             background: #1a1a1a; color: white; border: none;
@@ -215,6 +228,34 @@
             cursor: pointer; font-size: 26px; color: #bbb;
         }
         .sheet-content { position: relative; }
+
+        @media (min-width: 700px) {
+            .container { max-width: 900px; }
+            .cart-bar { max-width: 500px; left: auto; right: 40px; }
+
+            .menu-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                gap: 18px;
+            }
+            .menu-item {
+                flex-direction: column;
+                align-items: flex-start;
+                text-align: left;
+                padding: 16px;
+            }
+            .item-photo, .item-photo-fallback {
+                width: 100%;
+                height: 150px;
+                margin-right: 0;
+                margin-bottom: 14px;
+                border-radius: 16px;
+            }
+            .item-photo-fallback { font-size: 44px; }
+            .item-info { width: 100%; margin-bottom: 12px; }
+            .menu-item .description { -webkit-line-clamp: 3; }
+            .menu-item .add-btn { align-self: flex-end; }
+        }
     </style>
 </head>
 <body>
@@ -230,8 +271,10 @@
     </header>
 
     <div class="hero">
-        <div class="tagline">What are you craving today?</div>
-        <div class="tagline-sub">Fresh picks, made to order, straight to your table</div>
+        <div class="hero-inner">
+            <div class="tagline">What are you craving today?</div>
+            <div class="tagline-sub">Fresh picks, made to order, straight to your table</div>
+        </div>
     </div>
 
     <div class="container" id="app">
@@ -274,6 +317,10 @@
         function getImage(item) {
             const data = menu[item];
             return typeof data === "object" ? data.image : null;
+        }
+        function getDescription(item) {
+            const data = menu[item];
+            return typeof data === "object" ? data.description : null;
         }
 
         function init() {
@@ -334,25 +381,33 @@
                 return;
             }
 
-            let html = `<div class="section-title"><span class="bar"></span>Menu</div>`;
+            let itemsHtml = "";
             items.forEach(item => {
                 const price = getPrice(item);
                 const image = getImage(item);
+                const description = getDescription(item);
                 const imageHtml = image
                     ? `<img src="${image}" class="item-photo" onerror="this.outerHTML='<div class=\\'item-photo-fallback\\'>🍽️</div>'">`
                     : `<div class="item-photo-fallback">🍽️</div>`;
-                html += `
+                const descriptionHtml = description
+                    ? `<div class="description">${description}</div>`
+                    : "";
+                itemsHtml += `
                     <div class="menu-item">
                         ${imageHtml}
                         <div class="item-info">
                             <div class="name">${capitalize(item)}</div>
+                            ${descriptionHtml}
                             <div class="price">€${Number(price).toFixed(2)}</div>
                         </div>
                         <button class="add-btn" onclick="addToCart('${item}')">+</button>
                     </div>
                 `;
             });
-            html += `
+
+            app.innerHTML = `
+                <div class="section-title"><span class="bar"></span>Menu</div>
+                <div class="menu-grid">${itemsHtml}</div>
                 <div class="action-buttons">
                     <button class="call-btn" id="callBtn" onclick="callWaiter()">🔔 Call Waiter</button>
                     <button class="pay-btn" id="payBtn" onclick="requestPayment()">💳 Request the Bill</button>
@@ -360,7 +415,6 @@
                 <div class="section-title orders"><span class="bar"></span>Your Orders</div>
                 <div id="ordersList"><p class="empty-orders">No orders yet.</p></div>
             `;
-            app.innerHTML = html;
         }
 
         function capitalize(s) {
