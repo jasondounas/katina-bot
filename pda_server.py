@@ -11,12 +11,12 @@ app.add_middleware(
 )
 
 MENU = {
-    "coke": 3.50,
-    "burger": 9.90,
-    "salad": 7.20,
+    "coke": {"price": 3.50, "image": "images/coke.jpg"},
+    "burger": {"price": 9.90, "image": "images/burger.jpg"},
+    "salad": {"price": 7.20, "image": "images/salad.jpg"},
 }
 
-kitchen_tickets = []  # in-memory list, same idea as your early sessions/orders dicts
+kitchen_tickets = []
 
 
 @app.get("/menu")
@@ -27,12 +27,7 @@ def get_menu():
 @app.post("/kitchen-ticket")
 def kitchen_ticket(order_id: str, item: str, qty: int):
     print(f"🧾 KITCHEN TICKET — Order {order_id}: {qty}x {item}")
-    kitchen_tickets.append({
-        "order_id": order_id,
-        "item": item,
-        "qty": qty,
-        "done": False,
-    })
+    kitchen_tickets.append({"order_id": order_id, "item": item, "qty": qty, "done": False})
     return {"success": True}
 
 
