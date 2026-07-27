@@ -451,9 +451,10 @@ def get_price_from_pda(item: str) -> float:
     try:
         response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
         menu = response.json()
-        return menu.get(item, 0)
-    except httpx.RequestError as e:
-        print(f"⚠ PDA unreachable while fetching menu — {e}")
+        item_data = menu.get(item)
+        return item_data["price"] if item_data else 0
+    except (httpx.RequestError, KeyError, TypeError) as e:
+        print(f"⚠ PDA unreachable or bad data while fetching menu — {e}")
         return 0
 
 
