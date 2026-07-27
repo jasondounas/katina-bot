@@ -2,18 +2,19 @@
 <html>
 <head>
     <title>Katina — Waiter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, sans-serif;
-            background: #f4f5f7;
-            margin: 0;
-            padding: 0;
+            font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background: #f7f5f2;
+            color: #1a1a1a;
         }
+
         header {
-            background: #2c3e50;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            padding: 24px 24px 20px;
             color: white;
-            padding: 16px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -21,128 +22,169 @@
             top: 0;
             z-index: 10;
         }
-        header h1 { margin: 0; font-size: 20px; }
+        .brand { display: flex; align-items: center; gap: 14px; }
+        .logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 6px 16px rgba(255,107,53,0.35);
+        }
+        header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
         .bell {
-            background: #e74c3c;
-            border-radius: 50%;
-            padding: 4px 10px;
+            background: #ff6b35;
+            border-radius: 20px;
+            padding: 8px 16px;
             font-size: 13px;
+            font-weight: 700;
             display: none;
         }
-        .container { padding: 20px; max-width: 900px; margin: 0 auto; }
+        .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
 
         .open-form {
             background: white;
-            border-radius: 10px;
-            padding: 16px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
         }
+        .open-form b { font-size: 15px; }
         .open-form input {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
+            padding: 12px 14px;
+            border: 1.5px solid #eee;
+            border-radius: 12px;
             margin-right: 8px;
-        }
-        button {
-            background: #2980b9;
-            color: white;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
+            margin-top: 12px;
             font-size: 14px;
         }
+        button {
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.96); }
         button.danger { background: #e74c3c; }
-        button.success { background: #27ae60; }
-        button.secondary { background: #95a5a6; }
+        button.success { background: #1d7d72; }
+        button.secondary { background: #f0f0f0; color: #555; }
+        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+
+        .section-title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 22px; font-weight: 800;
+            margin: 8px 0 18px;
+        }
+        .section-title .bar {
+            width: 5px; height: 22px; border-radius: 3px;
+            background: #ff6b35;
+        }
+        .section-title .count-badge {
+            background: #eee; color: #666;
+            font-size: 13px; font-weight: 700;
+            padding: 3px 10px; border-radius: 20px;
+        }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 14px;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
         }
         .card {
             background: white;
-            border-radius: 10px;
-            padding: 14px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 18px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
             cursor: pointer;
-            border-left: 5px solid #bdc3c7;
-            transition: transform 0.1s;
+            border-top: 5px solid #ddd;
+            transition: transform 0.15s;
         }
-        .card:hover { transform: translateY(-2px); }
-        .card.empty { border-left-color: #27ae60; }
-        .card.has-pending { border-left-color: #e67e22; }
-        .card.called { border-left-color: #f39c12; }
-        .card.wants-pay { border-left-color: #8e44ad; }
-        .card.needs-release { border-left-color: #7f8c8d; }
-        .card h3 { margin: 0 0 6px 0; }
-        .card .meta { font-size: 13px; color: #666; margin: 2px 0; }
+        .card:hover { transform: translateY(-3px); }
+        .card.empty { border-top-color: #1d7d72; }
+        .card.has-pending { border-top-color: #ff6b35; }
+        .card.called { border-top-color: #f39c12; }
+        .card.wants-pay { border-top-color: #7c3aed; }
+        .card.needs-release { border-top-color: #999; }
+        .card h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+        .card .meta { font-size: 13px; color: #777; margin: 3px 0; }
         .pill {
             display: inline-block;
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 20px;
-            background: #ecf0f1;
-            margin-top: 6px;
-            margin-right: 4px;
+            font-size: 11px; font-weight: 800;
+            padding: 4px 12px; border-radius: 20px;
+            background: #f0f0f0;
+            margin-top: 8px; margin-right: 4px;
         }
-        .pill.pending { background: #fdebd0; color: #b9770e; }
-        .pill.called { background: #fdebd0; color: #f39c12; }
-        .pill.pay { background: #f4ecf7; color: #8e44ad; }
-        .pill.release { background: #ecf0f1; color: #555; }
+        .pill.pending { background: #fff4e6; color: #b9770e; }
+        .pill.called { background: #fff4e6; color: #f39c12; }
+        .pill.pay { background: #f3ecfb; color: #7c3aed; }
+        .pill.release { background: #eee; color: #666; }
 
         .overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.4);
+            background: rgba(0,0,0,0.55);
             align-items: center;
             justify-content: center;
             z-index: 20;
         }
         .modal {
             background: white;
-            border-radius: 12px;
-            padding: 20px;
-            width: 90%;
-            max-width: 500px;
+            border-radius: 24px;
+            padding: 28px;
+            width: 92%;
+            max-width: 520px;
             max-height: 85vh;
             overflow-y: auto;
+            position: relative;
         }
-        .modal h2 { margin-top: 0; }
+        .modal h2 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
         .order-line {
-            border-bottom: 1px solid #eee;
-            padding: 10px 0;
+            border-bottom: 1px solid #f2f2f2;
+            padding: 14px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .order-line .info { font-size: 14px; }
-        .order-line .actions button { margin-left: 4px; font-size: 12px; padding: 5px 8px; }
-        .action-row { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
-        .close-modal { float: right; cursor: pointer; font-size: 20px; color: #888; }
+        .order-line .info { font-size: 14px; font-weight: 600; }
+        .order-line .actions button { margin-left: 6px; font-size: 12px; padding: 8px 12px; }
+        .action-row { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .close-modal {
+            position: absolute; top: 24px; right: 24px;
+            cursor: pointer; font-size: 24px; color: #bbb;
+        }
+        #modalResult { margin-top: 14px; font-size: 13px; font-weight: 600; color: #555; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>🍽️ Katina — Waiter</h1>
+        <div class="brand">
+            <div class="logo">🍽️</div>
+            <h1>Katina — Waiter</h1>
+        </div>
         <span class="bell" id="bell">🔔 <span id="bellCount">0</span> new</span>
     </header>
 
     <div class="container">
 
         <div class="open-form">
-            <b>Register a New Table</b><br><br>
+            <b>Register a New Table</b><br>
             <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
             <input type="text" id="newTableLabel" placeholder="display name (optional)">
-            <button onclick="registerTable()">Register Table</button>
-            <p id="registerResult"></p>
+            <button class="primary" onclick="registerTable()">Register Table</button>
+            <p id="registerResult" style="margin-top:10px; font-size:13px; color:#555;"></p>
         </div>
 
-        <h2>Tables</h2>
+        <div class="section-title">
+            <span class="bar"></span>Tables
+            <span class="count-badge" id="tableCount">0</span>
+        </div>
         <div class="grid" id="tableGrid"></div>
     </div>
 
@@ -173,23 +215,19 @@
                 });
         }
 
-        // ---------- Single source of truth: table.active_session_id + GET /sessions/{id} ----------
-
         function loadTables() {
             Promise.all([
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
             ]).then(([tables, pendingOrders]) => {
 
+                document.getElementById("tableCount").innerText = tables.length;
+
                 const pendingCountBySession = {};
                 pendingOrders.forEach(o => {
                     pendingCountBySession[o.session_id] = (pendingCountBySession[o.session_id] || 0) + 1;
                 });
 
-                // For every table that has an active_session_id, fetch that
-                // exact session directly — regardless of its status. This is
-                // the fix: we never rely on the filtered "open sessions" list
-                // to decide what a table's card should look like.
                 const sessionFetches = tables
                     .filter(t => t.active_session_id)
                     .map(t =>
@@ -222,7 +260,6 @@
                         }
 
                         if (session.status !== "OPEN") {
-                            // Session was closed/deleted but the table was never released
                             grid.innerHTML += `
                                 <div class="card needs-release" onclick="openTableModal('${t.table_id}')">
                                     <h3>${t.display_label || t.table_id}</h3>
@@ -275,13 +312,12 @@
                     const table = tables.find(t => t.table_id === tableId);
 
                     if (!table || !table.active_session_id) {
-                        // Empty — offer to open a session
                         content.innerHTML = `
                             <h2>${tableId}</h2>
-                            <p style="color:#27ae60;">🟢 This table is currently empty.</p>
-                            <input type="number" id="quickPartySize" placeholder="party size" value="2">
+                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
+                            <input type="number" id="quickPartySize" placeholder="party size" value="2" style="padding:12px; border:1.5px solid #eee; border-radius:12px; margin-right:8px;">
                             <button class="success" onclick="openSessionForCurrentTable()">Open Session</button>
-                            <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                            <p id="modalResult"></p>
                         `;
                         if (!silent) document.getElementById("overlay").style.display = "flex";
                         return;
@@ -291,12 +327,11 @@
                         .then(r => r.json())
                         .then(session => {
                             if (session.error || session.status !== "OPEN") {
-                                // Session exists but is closed/deleted — table just needs releasing
                                 content.innerHTML = `
                                     <h2>${tableId}</h2>
-                                    <p style="color:#7f8c8d;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
+                                    <p style="color:#777; font-weight:600; margin:12px 0;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
-                                    <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                                    <p id="modalResult"></p>
                                 `;
                                 if (!silent) document.getElementById("overlay").style.display = "flex";
                                 return;
@@ -310,7 +345,7 @@
                                     let ordersHtml = orders.length
                                         ? orders.map(o => `
                                             <div class="order-line">
-                                                <div class="info">${statusEmoji[o.status] || ""} <b>${o.qty}x ${o.item}</b> — €${(o.price * o.qty).toFixed(2)}</div>
+                                                <div class="info">${statusEmoji[o.status] || ""} ${o.qty}x ${o.item} — €${(o.price * o.qty).toFixed(2)}</div>
                                                 <div class="actions">
                                                     ${o.status === "PENDING_REVIEW" ? `
                                                         <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
@@ -319,23 +354,23 @@
                                                 </div>
                                             </div>
                                         `).join("")
-                                        : "<p>No orders yet.</p>";
+                                        : "<p style='color:#999; padding:10px 0;'>No orders yet.</p>";
 
                                     let alerts = "";
                                     if (session.waiter_called) {
-                                        alerts += `<p style="color:#f39c12;">🔔 This table called for a waiter.
-                                            <button class="secondary" onclick="acknowledgeCall()">Acknowledge</button></p>`;
+                                        alerts += `<p style="color:#f39c12; font-weight:600; margin:10px 0;">🔔 This table called for a waiter.
+                                            <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">Acknowledge</button></p>`;
                                     }
                                     if (session.payment_requested) {
-                                        alerts += `<p style="color:#8e44ad;">💳 This table requested the bill.</p>`;
+                                        alerts += `<p style="color:#7c3aed; font-weight:600; margin:10px 0;">💳 This table requested the bill.</p>`;
                                     }
 
                                     content.innerHTML = `
                                         <h2>${tableId}</h2>
-                                        <p>👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
-                                        <p><small>Customer link: <a href="customer.html?table=${tableId}" target="_blank">open</a></small></p>
+                                        <p style="color:#777; margin:6px 0 12px;">👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
+                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:600;">Customer link ↗</a></p>
                                         ${alerts}
-                                        <h3>Orders</h3>
+                                        <div class="section-title" style="font-size:16px; margin:20px 0 10px;"><span class="bar" style="height:16px;"></span>Orders</div>
                                         ${ordersHtml}
                                         <div class="action-row">
                                             <button class="secondary" onclick="calculateSplit('${session.session_id}')">Calculate Split</button>
@@ -343,7 +378,7 @@
                                             <button onclick="closeSession('${session.session_id}')">Close Session</button>
                                             <button class="danger" onclick="deleteSession('${session.session_id}')">Delete Session</button>
                                         </div>
-                                        <p id="modalResult" style="margin-top:10px; font-size:13px;"></p>
+                                        <p id="modalResult"></p>
                                     `;
 
                                     if (!silent) document.getElementById("overlay").style.display = "flex";
