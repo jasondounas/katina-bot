@@ -13,14 +13,14 @@
 
         header {
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-            padding: 24px 24px 20px;
+            padding: 20px 24px;
             color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
-            z-index: 10;
+            z-index: 30;
         }
         .brand { display: flex; align-items: center; gap: 14px; }
         .logo {
@@ -32,48 +32,57 @@
             box-shadow: 0 6px 16px rgba(255,107,53,0.35);
         }
         header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
-        .bell {
-            background: #ff6b35;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 700;
-            display: none;
-        }
-        .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
 
-        .open-form {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 24px;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
-        }
-        .open-form b { font-size: 15px; }
-        .open-form input {
-            padding: 12px 14px;
-            border: 1.5px solid #eee;
-            border-radius: 12px;
-            margin-right: 8px;
-            margin-top: 12px;
-            font-size: 14px;
-        }
-        button {
-            background: #1a1a1a;
-            color: white;
+        /* Notification bell — a real clickable button with a dropdown panel */
+        .bell-wrap { position: relative; }
+        .bell-btn {
+            background: rgba(255,255,255,0.1);
             border: none;
-            padding: 12px 18px;
-            border-radius: 12px;
-            cursor: pointer;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 14px;
             font-size: 14px;
             font-weight: 700;
-            transition: transform 0.1s;
+            cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
         }
-        button:active { transform: scale(0.96); }
-        button.danger { background: #e74c3c; }
-        button.success { background: #1d7d72; }
-        button.secondary { background: #f0f0f0; color: #555; }
-        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+        .bell-btn.active { background: #ff6b35; }
+        .bell-count {
+            background: #ff6b35;
+            color: white;
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800;
+        }
+        .bell-btn.active .bell-count { background: rgba(255,255,255,0.3); }
+
+        .notif-panel {
+            display: none;
+            position: absolute;
+            top: 56px; right: 0;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+            width: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 8px;
+            z-index: 30;
+        }
+        .notif-panel.open { display: block; }
+        .notif-empty { padding: 30px 20px; text-align: center; color: #aaa; font-size: 14px; }
+        .notif-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px; border-radius: 12px; cursor: pointer;
+        }
+        .notif-row:hover { background: #f7f5f2; }
+        .notif-row .info { font-size: 14px; }
+        .notif-row .table-name { font-weight: 800; }
+        .notif-row .type { font-size: 12px; color: #777; margin-top: 2px; }
+        .notif-row .go { font-size: 18px; color: #ff6b35; }
+
+        .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
 
         .section-title {
             display: flex; align-items: center; gap: 10px;
@@ -95,34 +104,60 @@
             grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
             gap: 16px;
         }
+
+        /* Add-table tile — matches the card grid, dashed border */
+        .add-tile {
+            border: 2.5px dashed #ddd;
+            border-radius: 20px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 30px 18px;
+            cursor: pointer;
+            color: #999;
+            transition: transform 0.15s, border-color 0.15s, color 0.15s;
+            min-height: 140px;
+        }
+        .add-tile:hover { border-color: #ff6b35; color: #ff6b35; transform: translateY(-3px); }
+        .add-tile .plus { font-size: 32px; font-weight: 300; line-height: 1; margin-bottom: 6px; }
+        .add-tile .label { font-size: 14px; font-weight: 700; }
+
         .card {
             background: white;
             border-radius: 20px;
-            padding: 18px;
+            overflow: hidden;
             box-shadow: 0 3px 14px rgba(0,0,0,0.05);
             cursor: pointer;
-            border-top: 5px solid #ddd;
             transition: transform 0.15s;
         }
         .card:hover { transform: translateY(-3px); }
-        .card.empty { border-top-color: #1d7d72; }
-        .card.has-pending { border-top-color: #ff6b35; }
-        .card.called { border-top-color: #f39c12; }
-        .card.wants-pay { border-top-color: #7c3aed; }
-        .card.needs-release { border-top-color: #999; }
-        .card h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
-        .card .meta { font-size: 13px; color: #777; margin: 3px 0; }
-        .pill {
-            display: inline-block;
-            font-size: 11px; font-weight: 800;
-            padding: 4px 12px; border-radius: 20px;
-            background: #f0f0f0;
-            margin-top: 8px; margin-right: 4px;
+
+        /* Alert banner — full-width colored strip at the top of the card, unmissable */
+        .card-alert {
+            padding: 10px 16px;
+            font-size: 12.5px;
+            font-weight: 800;
+            color: white;
         }
-        .pill.pending { background: #fff4e6; color: #b9770e; }
-        .pill.called { background: #fff4e6; color: #f39c12; }
-        .pill.pay { background: #f3ecfb; color: #7c3aed; }
-        .pill.release { background: #eee; color: #666; }
+        .card-alert.called { background: #f39c12; }
+        .card-alert.pay { background: #7c3aed; }
+        .card-alert.pending { background: #ff6b35; }
+        .card-alert.release { background: #999; }
+
+        .card-body { padding: 18px; border-top: 5px solid #eee; }
+        .card.empty .card-body { border-top-color: #1d7d72; }
+        .card.has-alert .card-body { border-top: none; padding-top: 14px; }
+
+        .card h3 { font-size: 19px; font-weight: 800; margin-bottom: 10px; }
+        .card-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+        .stat {
+            font-size: 13px; font-weight: 700;
+            background: #f7f5f2; color: #555;
+            padding: 6px 12px; border-radius: 10px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .stat.paid { background: #e6f5f3; color: #1d7d72; }
+        .stat.unpaid { background: #fce8e6; color: #c0392b; }
+        .stat.empty-stat { background: #e6f5f3; color: #1d7d72; }
 
         .overlay {
             display: none;
@@ -144,6 +179,33 @@
             position: relative;
         }
         .modal h2 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+        .modal input {
+            padding: 12px 14px;
+            border: 1.5px solid #eee;
+            border-radius: 12px;
+            margin-top: 10px;
+            margin-right: 8px;
+            font-size: 14px;
+            width: 100%;
+            max-width: 220px;
+        }
+        button {
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.96); }
+        button.danger { background: #e74c3c; }
+        button.success { background: #1d7d72; }
+        button.secondary { background: #f0f0f0; color: #555; }
+        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+
         .order-line {
             border-bottom: 1px solid #f2f2f2;
             padding: 14px 0;
@@ -168,18 +230,15 @@
             <div class="logo">🍽️</div>
             <h1>Katina — Waiter</h1>
         </div>
-        <span class="bell" id="bell">🔔 <span id="bellCount">0</span> new</span>
+        <div class="bell-wrap">
+            <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
+                🔔 <span class="bell-count" id="bellCount">0</span>
+            </button>
+            <div class="notif-panel" id="notifPanel"></div>
+        </div>
     </header>
 
     <div class="container">
-
-        <div class="open-form">
-            <b>Register a New Table</b><br>
-            <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
-            <input type="text" id="newTableLabel" placeholder="display name (optional)">
-            <button class="primary" onclick="registerTable()">Register Table</button>
-            <p id="registerResult" style="margin-top:10px; font-size:13px; color:#555;"></p>
-        </div>
 
         <div class="section-title">
             <span class="bar"></span>Tables
@@ -198,6 +257,24 @@
     <script>
         const BASE = "https://katina-bot.onrender.com";
         let currentTableId = null;
+        let currentAlerts = [];
+
+        // ---------- Add Table (now a modal, triggered by the dashed tile) ----------
+
+        function openAddTableModal() {
+            currentTableId = null;
+            document.getElementById("modalContent").innerHTML = `
+                <h2>Register a New Table</h2>
+                <p style="color:#777; margin:8px 0 16px; font-size:14px;">One-time setup — this table stays forever, sessions come and go on top of it.</p>
+                <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
+                <input type="text" id="newTableLabel" placeholder="display name (optional)">
+                <div style="margin-top:16px;">
+                    <button class="primary" onclick="registerTable()">Register Table</button>
+                </div>
+                <p id="modalResult"></p>
+            `;
+            document.getElementById("overlay").style.display = "flex";
+        }
 
         function registerTable() {
             const tableId = document.getElementById("newTableId").value;
@@ -207,13 +284,50 @@
             fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, { method: "POST" })
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById("registerResult").innerText =
-                        data.error || `Table "${tableId}" registered.`;
-                    document.getElementById("newTableId").value = "";
-                    document.getElementById("newTableLabel").value = "";
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    closeModal();
                     loadTables();
                 });
         }
+
+        // ---------- Notification panel ----------
+
+        function toggleNotifPanel() {
+            const panel = document.getElementById("notifPanel");
+            const btn = document.getElementById("bellBtn");
+            const isOpen = panel.classList.contains("open");
+            panel.classList.toggle("open", !isOpen);
+            btn.classList.toggle("active", !isOpen);
+            if (!isOpen) renderNotifPanel();
+        }
+
+        function renderNotifPanel() {
+            const panel = document.getElementById("notifPanel");
+            if (currentAlerts.length === 0) {
+                panel.innerHTML = `<div class="notif-empty">No active alerts 🎉</div>`;
+                return;
+            }
+            panel.innerHTML = currentAlerts.map(a => `
+                <div class="notif-row" onclick="jumpToTable('${a.tableId}')">
+                    <div class="info">
+                        <div class="table-name">${a.label}</div>
+                        <div class="type">${a.text}</div>
+                    </div>
+                    <div class="go">→</div>
+                </div>
+            `).join("");
+        }
+
+        function jumpToTable(tableId) {
+            document.getElementById("notifPanel").classList.remove("open");
+            document.getElementById("bellBtn").classList.remove("active");
+            openTableModal(tableId);
+        }
+
+        // ---------- Tables grid ----------
 
         function loadTables() {
             Promise.all([
@@ -242,60 +356,84 @@
                         if (!r.session.error) sessionByTableId[r.table_id] = r.session;
                     });
 
+                    currentAlerts = [];
                     const grid = document.getElementById("tableGrid");
-                    grid.innerHTML = "";
-                    let totalPending = 0;
+                    grid.innerHTML = `
+                        <div class="add-tile" onclick="openAddTableModal()">
+                            <div class="plus">+</div>
+                            <div class="label">Register Table</div>
+                        </div>
+                    `;
 
                     tables.forEach(t => {
+                        const label = t.display_label || t.table_id;
                         const session = sessionByTableId[t.table_id];
 
                         if (!session) {
                             grid.innerHTML += `
                                 <div class="card empty" onclick="openTableModal('${t.table_id}')">
-                                    <h3>${t.display_label || t.table_id}</h3>
-                                    <div class="meta">🟢 Empty</div>
+                                    <div class="card-body">
+                                        <h3>${label}</h3>
+                                        <div class="card-stats"><span class="stat empty-stat">🟢 Empty</span></div>
+                                    </div>
                                 </div>
                             `;
                             return;
                         }
 
                         if (session.status !== "OPEN") {
+                            currentAlerts.push({ tableId: t.table_id, label, text: "Needs release" });
                             grid.innerHTML += `
-                                <div class="card needs-release" onclick="openTableModal('${t.table_id}')">
-                                    <h3>${t.display_label || t.table_id}</h3>
-                                    <div class="meta">⏹️ Session ${session.status.toLowerCase()}</div>
-                                    <span class="pill release">Needs release</span>
+                                <div class="card has-alert" onclick="openTableModal('${t.table_id}')">
+                                    <div class="card-alert release">⏹️ NEEDS RELEASE</div>
+                                    <div class="card-body">
+                                        <h3>${label}</h3>
+                                        <div class="card-stats"><span class="stat">Session ${session.status.toLowerCase()}</span></div>
+                                    </div>
                                 </div>
                             `;
                             return;
                         }
 
                         const pending = pendingCountBySession[session.session_id] || 0;
-                        totalPending += pending;
 
-                        let cardClass = "";
-                        if (pending > 0) cardClass = "has-pending";
-                        if (session.waiter_called) cardClass = "called";
-                        if (session.payment_requested) cardClass = "wants-pay";
+                        // Priority order for the banner: called > wants pay > pending
+                        let bannerClass = "";
+                        let bannerText = "";
+                        if (session.waiter_called) {
+                            bannerClass = "called"; bannerText = "🔔 CALLING WAITER";
+                            currentAlerts.push({ tableId: t.table_id, label, text: "Called for a waiter" });
+                        } else if (session.payment_requested) {
+                            bannerClass = "pay"; bannerText = "💳 WANTS TO PAY";
+                            currentAlerts.push({ tableId: t.table_id, label, text: "Requested the bill" });
+                        } else if (pending > 0) {
+                            bannerClass = "pending"; bannerText = `🧾 ${pending} NEW ORDER${pending > 1 ? "S" : ""}`;
+                        }
+                        if (pending > 0 && bannerClass !== "pending") {
+                            currentAlerts.push({ tableId: t.table_id, label, text: `${pending} order(s) awaiting review` });
+                        }
 
-                        let badges = "";
-                        if (pending > 0) badges += `<span class="pill pending">${pending} pending</span>`;
-                        if (session.waiter_called) badges += `<span class="pill called">🔔 called</span>`;
-                        if (session.payment_requested) badges += `<span class="pill pay">💳 wants to pay</span>`;
+                        const bannerHtml = bannerClass
+                            ? `<div class="card-alert ${bannerClass}">${bannerText}</div>`
+                            : "";
 
                         grid.innerHTML += `
-                            <div class="card ${cardClass}" onclick="openTableModal('${t.table_id}')">
-                                <h3>${t.display_label || t.table_id}</h3>
-                                <div class="meta">👥 ${session.party_size} people</div>
-                                <div class="meta">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</div>
-                                ${badges}
+                            <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${t.table_id}')">
+                                ${bannerHtml}
+                                <div class="card-body">
+                                    <h3>${label}</h3>
+                                    <div class="card-stats">
+                                        <span class="stat">👥 ${session.party_size}</span>
+                                        <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</span>
+                                        ${pending > 0 && bannerClass !== "pending" ? `<span class="stat">🧾 ${pending} pending</span>` : ""}
+                                    </div>
+                                </div>
                             </div>
                         `;
                     });
 
-                    const bell = document.getElementById("bell");
-                    bell.style.display = totalPending > 0 ? "inline-block" : "none";
-                    document.getElementById("bellCount").innerText = totalPending;
+                    document.getElementById("bellCount").innerText = currentAlerts.length;
+                    if (document.getElementById("notifPanel").classList.contains("open")) renderNotifPanel();
 
                     if (currentTableId) openTableModal(currentTableId, true);
                 });
@@ -310,13 +448,14 @@
                 .then(r => r.json())
                 .then(tables => {
                     const table = tables.find(t => t.table_id === tableId);
+                    const label = table ? (table.display_label || table.table_id) : tableId;
 
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
-                            <h2>${tableId}</h2>
+                            <h2>${label}</h2>
                             <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
-                            <input type="number" id="quickPartySize" placeholder="party size" value="2" style="padding:12px; border:1.5px solid #eee; border-radius:12px; margin-right:8px;">
-                            <button class="success" onclick="openSessionForCurrentTable()">Open Session</button>
+                            <input type="number" id="quickPartySize" placeholder="party size" value="2" style="width:120px;">
+                            <div style="margin-top:12px;"><button class="success" onclick="openSessionForCurrentTable()">Open Session</button></div>
                             <p id="modalResult"></p>
                         `;
                         if (!silent) document.getElementById("overlay").style.display = "flex";
@@ -328,7 +467,7 @@
                         .then(session => {
                             if (session.error || session.status !== "OPEN") {
                                 content.innerHTML = `
-                                    <h2>${tableId}</h2>
+                                    <h2>${label}</h2>
                                     <p style="color:#777; font-weight:600; margin:12px 0;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
                                     <p id="modalResult"></p>
@@ -358,19 +497,19 @@
 
                                     let alerts = "";
                                     if (session.waiter_called) {
-                                        alerts += `<p style="color:#f39c12; font-weight:600; margin:10px 0;">🔔 This table called for a waiter.
+                                        alerts += `<p style="color:#f39c12; font-weight:700; margin:10px 0;">🔔 This table called for a waiter.
                                             <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">Acknowledge</button></p>`;
                                     }
                                     if (session.payment_requested) {
-                                        alerts += `<p style="color:#7c3aed; font-weight:600; margin:10px 0;">💳 This table requested the bill.</p>`;
+                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">💳 This table requested the bill.</p>`;
                                     }
 
                                     content.innerHTML = `
-                                        <h2>${tableId}</h2>
+                                        <h2>${label}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
-                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:600;">Customer link ↗</a></p>
+                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">Customer link ↗</a></p>
                                         ${alerts}
-                                        <div class="section-title" style="font-size:16px; margin:20px 0 10px;"><span class="bar" style="height:16px;"></span>Orders</div>
+                                        <h3 style="font-size:16px; margin:20px 0 10px;">Orders</h3>
                                         ${ordersHtml}
                                         <div class="action-row">
                                             <button class="secondary" onclick="calculateSplit('${session.session_id}')">Calculate Split</button>
