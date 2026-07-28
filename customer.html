@@ -259,6 +259,7 @@
             font-size: 17px; font-weight: 800; margin-top: 24px; cursor: pointer;
             box-shadow: 0 8px 20px rgba(255,107,53,0.35);
         }
+        .submit-btn:disabled { background: #ccc; box-shadow: none; cursor: default; }
         .close-sheet {
             position: absolute; top: 24px; right: 24px;
             cursor: pointer; font-size: 26px; color: #bbb;
@@ -356,6 +357,11 @@
         function getDescription(item) {
             const data = menu[item];
             return typeof data === "object" ? data.description : null;
+        }
+
+        function generateIdempotencyKey() {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return "key_" + Date.now() + "_" + Math.random().toString(36).slice(2);
         }
 
         function init() {
@@ -562,10 +568,15 @@
             const items = Object.keys(cart);
             if (items.length === 0) return alert("Add something to your cart first.");
 
-            const requests = items.map(item =>
-                fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}`, { method: "POST" })
-                    .then(r => r.json())
-            );
+            const submitBtn = document.querySelector(".submit-btn");
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Sending...";
+
+            const requests = items.map(item => {
+                const key = generateIdempotencyKey();
+                return fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}&idempotency_key=${key}`, { method: "POST" })
+                    .then(r => r.json());
+            });
 
             Promise.all(requests).then(() => {
                 cart = {};
@@ -573,6 +584,12 @@
                 updateItemBadges();
                 closeCartSheet();
                 loadMyOrders();
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Send Order to Waiter";
+            }).catch(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Send Order to Waiter";
+                alert("Something went wrong — please try again.");
             });
         }
 

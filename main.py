@@ -25,7 +25,6 @@ def get_connection():
 
 
 def get_cursor(conn):
-    # returns rows as dict-like objects, same convenience as sqlite3.Row gave us
     return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
@@ -68,27 +67,29 @@ def init_db():
             cur.execute(f"ALTER TABLE sessions ADD COLUMN {column_def}")
             conn.commit()
         except psycopg2.errors.DuplicateColumn:
-            conn.rollback()  # Postgres requires a rollback after a failed statement
+            conn.rollback()
+
+    # Migration: idempotency key column + unique index, for orders
+    try:
+        cur.execute("ALTER TABLE orders ADD COLUMN idempotency_key TEXT")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("""
+            CREATE UNIQUE INDEX idx_orders_idempotency
+            ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL
+        """)
+        conn.commit()
+    except psycopg2.errors.DuplicateTable:
+        conn.rollback()
 
     cur.close()
     conn.close()
 
 
 init_db()
-
-
-@app.get("/sessions/{session_id}")
-def get_session(session_id: str):
-    conn = get_connection()
-    cur = get_cursor(conn)
-    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
-    session = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if session is None:
-        return {"error": "Session not found"}
-    return dict(session)
 
 
 @app.get("/")
@@ -185,6 +186,20 @@ def release_table(table_id: str):
 
 
 # ---------- Sessions ----------
+
+@app.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if session is None:
+        return {"error": "Session not found"}
+    return dict(session)
+
 
 @app.get("/sessions")
 def list_sessions(status: str = "OPEN"):
@@ -452,16 +467,27 @@ def get_price_from_pda(item: str) -> float:
         response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
         menu = response.json()
         item_data = menu.get(item)
-        return item_data["price"] if item_data else 0
-    except (httpx.RequestError, KeyError, TypeError) as e:
+        if isinstance(item_data, dict):
+            return item_data.get("price", 0)
+        return item_data if item_data else 0
+    except (httpx.RequestError, ValueError, KeyError, TypeError) as e:
         print(f"⚠ PDA unreachable or bad data while fetching menu — {e}")
         return 0
 
 
 @app.post("/orders")
-def submit_order(session_id: str, item: str, qty: int):
+def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None):
     conn = get_connection()
     cur = get_cursor(conn)
+
+    if idempotency_key:
+        cur.execute("SELECT * FROM orders WHERE idempotency_key = %s", (idempotency_key,))
+        existing = cur.fetchone()
+        if existing:
+            cur.close()
+            conn.close()
+            return dict(existing)
+
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
 
@@ -474,8 +500,8 @@ def submit_order(session_id: str, item: str, qty: int):
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status) VALUES (%s, %s, %s, %s, %s, %s)",
-        (order_id, session_id, item, qty, price, "PENDING_REVIEW"),
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (order_id, session_id, item, qty, price, "PENDING_REVIEW", idempotency_key),
     )
     conn.commit()
     cur.close()
