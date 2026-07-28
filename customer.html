@@ -87,7 +87,6 @@
         .menu-item:active { transform: scale(0.98); }
 
         .photo-wrap { position: relative; margin-right: 16px; flex-shrink: 0; }
-        .item-photo, .item-photo-fallback { margin-right: 0; }
         .item-photo, .item-photo-fallback {
             width: 76px; height: 76px;
             border-radius: 18px;
@@ -125,16 +124,36 @@
             overflow: hidden;
         }
         .menu-item .price { color: #ff6b35; font-weight: 800; font-size: 16px; }
-        .menu-item .add-btn {
-            background: #1a1a1a; color: white; border: none;
-            width: 52px; height: 52px; border-radius: 50%;
-            font-size: 26px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
+
+        .qty-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             flex-shrink: 0;
+        }
+        .qty-row .add-btn {
+            background: #1a1a1a; color: white; border: none;
+            width: 42px; height: 42px; border-radius: 50%;
+            font-size: 22px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
             transition: transform 0.12s, background 0.12s;
             box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
-        .menu-item .add-btn:active { transform: scale(0.88); background: #ff6b35; }
+        .qty-row .add-btn:active { transform: scale(0.88); background: #ff6b35; }
+        .qty-row .minus-btn {
+            background: #f5f5f5; color: #1a1a1a; border: none;
+            width: 42px; height: 42px; border-radius: 50%;
+            font-size: 22px; cursor: pointer;
+            display: none;
+            align-items: center; justify-content: center;
+            transition: transform 0.12s;
+        }
+        .qty-row .minus-btn:active { transform: scale(0.88); }
+        .qty-row .qty-display {
+            display: none;
+            font-weight: 800; font-size: 16px;
+            min-width: 20px; text-align: center;
+        }
 
         .action-buttons {
             display: flex;
@@ -270,7 +289,7 @@
             .item-photo-fallback { font-size: 44px; }
             .item-info { width: 100%; margin-bottom: 12px; }
             .menu-item .description { -webkit-line-clamp: 3; }
-            .menu-item .add-btn { align-self: flex-end; }
+            .qty-row { align-self: flex-end; }
         }
     </style>
 </head>
@@ -419,7 +438,11 @@
                             ${descriptionHtml}
                             <div class="price">€${Number(price).toFixed(2)}</div>
                         </div>
-                        <button class="add-btn" onclick="addToCart('${item}')">+</button>
+                        <div class="qty-row" id="qtyrow-${item}">
+                            <button class="minus-btn" id="minus-${item}" onclick="changeQty('${item}', -1)">−</button>
+                            <span class="qty-display" id="qtydisplay-${item}"></span>
+                            <button class="add-btn" onclick="addToCart('${item}')">+</button>
+                        </div>
                     </div>
                 `;
             });
@@ -471,14 +494,29 @@
 
         function updateItemBadges() {
             Object.keys(menu).forEach(item => {
-                const badge = document.getElementById(`badge-${item}`);
-                if (!badge) return;
                 const qty = cart[item] || 0;
-                if (qty > 0) {
-                    badge.innerText = qty;
-                    badge.style.display = "flex";
-                } else {
-                    badge.style.display = "none";
+
+                const badge = document.getElementById(`badge-${item}`);
+                if (badge) {
+                    if (qty > 0) {
+                        badge.innerText = qty;
+                        badge.style.display = "flex";
+                    } else {
+                        badge.style.display = "none";
+                    }
+                }
+
+                const minusBtn = document.getElementById(`minus-${item}`);
+                const qtyDisplay = document.getElementById(`qtydisplay-${item}`);
+                if (minusBtn && qtyDisplay) {
+                    if (qty > 0) {
+                        minusBtn.style.display = "flex";
+                        qtyDisplay.style.display = "block";
+                        qtyDisplay.innerText = qty;
+                    } else {
+                        minusBtn.style.display = "none";
+                        qtyDisplay.style.display = "none";
+                    }
                 }
             });
         }
