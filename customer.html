@@ -85,18 +85,35 @@
             transition: transform 0.15s, box-shadow 0.15s;
         }
         .menu-item:active { transform: scale(0.98); }
+
+        .photo-wrap { position: relative; margin-right: 16px; flex-shrink: 0; }
+        .item-photo, .item-photo-fallback { margin-right: 0; }
         .item-photo, .item-photo-fallback {
             width: 76px; height: 76px;
             border-radius: 18px;
             object-fit: cover;
-            margin-right: 16px;
-            flex-shrink: 0;
         }
         .item-photo-fallback {
             background: linear-gradient(135deg, #fff4e6, #ffe4cc);
             display: flex; align-items: center; justify-content: center;
             font-size: 32px;
         }
+        .item-qty-badge {
+            position: absolute;
+            top: -8px; right: -8px;
+            background: #ff6b35;
+            color: white;
+            font-size: 13px;
+            font-weight: 800;
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 8px rgba(255,107,53,0.4);
+            border: 2px solid white;
+        }
+
         .item-info { flex: 1; min-width: 0; }
         .menu-item .name { font-weight: 700; font-size: 17px; margin-bottom: 3px; }
         .menu-item .description {
@@ -244,11 +261,10 @@
                 text-align: left;
                 padding: 16px;
             }
+            .photo-wrap { width: 100%; margin-right: 0; margin-bottom: 14px; }
             .item-photo, .item-photo-fallback {
                 width: 100%;
                 height: 150px;
-                margin-right: 0;
-                margin-bottom: 14px;
                 border-radius: 16px;
             }
             .item-photo-fallback { font-size: 44px; }
@@ -394,7 +410,10 @@
                     : "";
                 itemsHtml += `
                     <div class="menu-item">
-                        ${imageHtml}
+                        <div class="photo-wrap">
+                            ${imageHtml}
+                            <span class="item-qty-badge" id="badge-${item}"></span>
+                        </div>
                         <div class="item-info">
                             <div class="name">${capitalize(item)}</div>
                             ${descriptionHtml}
@@ -415,6 +434,7 @@
                 <div class="section-title orders"><span class="bar"></span>Your Orders</div>
                 <div id="ordersList"><p class="empty-orders">No orders yet.</p></div>
             `;
+            updateItemBadges();
         }
 
         function capitalize(s) {
@@ -438,13 +458,29 @@
         function addToCart(item) {
             cart[item] = (cart[item] || 0) + 1;
             updateCartBar();
+            updateItemBadges();
         }
 
         function changeQty(item, delta) {
             cart[item] = (cart[item] || 0) + delta;
             if (cart[item] <= 0) delete cart[item];
             updateCartBar();
+            updateItemBadges();
             renderCartSheet();
+        }
+
+        function updateItemBadges() {
+            Object.keys(menu).forEach(item => {
+                const badge = document.getElementById(`badge-${item}`);
+                if (!badge) return;
+                const qty = cart[item] || 0;
+                if (qty > 0) {
+                    badge.innerText = qty;
+                    badge.style.display = "flex";
+                } else {
+                    badge.style.display = "none";
+                }
+            });
         }
 
         function updateCartBar() {
@@ -496,6 +532,7 @@
             Promise.all(requests).then(() => {
                 cart = {};
                 updateCartBar();
+                updateItemBadges();
                 closeCartSheet();
                 loadMyOrders();
             });
