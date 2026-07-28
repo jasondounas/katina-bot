@@ -101,7 +101,7 @@ def get_menu():
     try:
         response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
         return response.json()
-    except httpx.RequestError:
+    except (httpx.RequestError, ValueError):
         return {}
 
 
