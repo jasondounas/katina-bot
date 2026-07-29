@@ -355,11 +355,14 @@
             fetch(`${BASE}/tables?table_id=__token_check__`, {
                 method: "POST",
                 headers: { "X-Waiter-Token": code }
-            }).then(r => r.json()).then(data => {
-                if (data.error === "Invalid or missing waiter token") {
+            }).then(r => {
+                if (r.status === 401) {
                     document.getElementById("loginError").innerText = "Incorrect code, try again.";
-                    return;
+                    return null;
                 }
+                return r.json();
+            }).then(data => {
+                if (!data) return;
                 localStorage.setItem("waiterToken", code);
                 document.getElementById("loginScreen").style.display = "none";
                 loadTables();
