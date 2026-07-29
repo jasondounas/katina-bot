@@ -316,7 +316,7 @@
                     <div class="sub" id="tableLabel">...</div>
                 </div>
             </div>
-            <button class="lang-toggle" onclick="toggleLang()" id="langToggle">🇬🇷 EN</button>
+            <button class="lang-toggle" onclick="toggleLang()" id="langToggle">🇬🇧 EN</button>
         </div>
     </header>
 
@@ -360,7 +360,6 @@
         let menu = {};
         let cart = {};
 
-        // ---------- Language ----------
         const T = {
             en: {
                 loading: "Loading...",
@@ -374,7 +373,9 @@
                 callWaiter: "🔔 Call Waiter",
                 waiterNotified: "🔔 Waiter notified",
                 requestBill: "💳 Request the Bill",
-                billRequested: "💳 Bill requested",
+                billRequested: "Bill requested",
+                cash: "Cash",
+                card: "Card",
                 yourOrders: "Your Orders",
                 noOrdersYet: "No orders yet.",
                 viewCart: "View cart",
@@ -399,7 +400,9 @@
                 callWaiter: "🔔 Κάλεσε Σερβιτόρο",
                 waiterNotified: "🔔 Ο σερβιτόρος ειδοποιήθηκε",
                 requestBill: "💳 Ζήτα τον Λογαριασμό",
-                billRequested: "💳 Ζητήθηκε ο λογαριασμός",
+                billRequested: "Ζητήθηκε ο λογαριασμός",
+                cash: "Μετρητά",
+                card: "Κάρτα",
                 yourOrders: "Οι Παραγγελίες σας",
                 noOrdersYet: "Δεν υπάρχουν παραγγελίες ακόμα.",
                 viewCart: "Δες το καλάθι",
@@ -419,11 +422,16 @@
         }
 
         function toggleLang() {
+            const btn = document.getElementById("langToggle");
+            btn.disabled = true;
+
             const newLang = getLang() === "gr" ? "en" : "gr";
             localStorage.setItem("katinaLang", newLang);
             applyStaticText();
             if (menu && Object.keys(menu).length) renderMenu();
             if (sessionId) loadMyOrders();
+
+            setTimeout(() => { btn.disabled = false; }, 300);
         }
 
         function t(key) {
@@ -552,9 +560,9 @@
             app.innerHTML = `
                 <div class="section-title"><span class="bar"></span>${t("menuTitle")}</div>
                 <div class="menu-grid">${itemsHtml}</div>
-                <div class="action-buttons">
+                <div class="action-buttons" id="actionButtons">
                     <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("callWaiter")}</button>
-                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">${t("requestBill")}</button>
+                    <button class="pay-btn" id="payBtn" onclick="showPaymentOptions()">${t("requestBill")}</button>
                 </div>
                 <div class="section-title orders"><span class="bar"></span>${t("yourOrders")}</div>
                 <div id="ordersList"><p class="empty-orders">${t("noOrdersYet")}</p></div>
@@ -573,11 +581,23 @@
             fetch(`${BASE}/sessions/${sessionId}/call-waiter`, { method: "POST" });
         }
 
-        function requestPayment() {
-            const btn = document.getElementById("payBtn");
-            btn.disabled = true;
-            btn.innerText = t("billRequested");
-            fetch(`${BASE}/sessions/${sessionId}/request-payment`, { method: "POST" });
+        function showPaymentOptions() {
+            const payBtn = document.getElementById("payBtn");
+            payBtn.outerHTML = `
+                <div style="display:flex; gap:8px; flex:1;">
+                    <button class="pay-btn" style="flex:1;" onclick="requestPayment('cash')">💵 ${t("cash")}</button>
+                    <button class="pay-btn" style="flex:1;" onclick="requestPayment('card')">💳 ${t("card")}</button>
+                </div>
+            `;
+        }
+
+        function requestPayment(method) {
+            fetch(`${BASE}/sessions/${sessionId}/request-payment?method=${method}`, { method: "POST" });
+            const icon = method === "cash" ? "💵" : "💳";
+            document.getElementById("actionButtons").innerHTML = `
+                <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("callWaiter")}</button>
+                <button class="pay-btn" disabled>${icon} ${t("billRequested")}</button>
+            `;
         }
 
         function addToCart(item) {
