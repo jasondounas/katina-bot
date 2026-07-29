@@ -76,6 +76,12 @@ def init_db():
             conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE sessions ADD COLUMN payment_method TEXT")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE orders ADD COLUMN idempotency_key TEXT")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -446,7 +452,7 @@ def acknowledge_call(session_id: str, _auth: None = Depends(verify_waiter)):
 
 
 @app.post("/sessions/{session_id}/request-payment")
-def request_payment(session_id: str):
+def request_payment(session_id: str, method: str = None):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -455,11 +461,14 @@ def request_payment(session_id: str):
         conn.close()
         return {"error": "Session not found"}
 
-    cur.execute("UPDATE sessions SET payment_requested = 1 WHERE session_id = %s", (session_id,))
+    cur.execute(
+        "UPDATE sessions SET payment_requested = 1, payment_method = %s WHERE session_id = %s",
+        (method, session_id),
+    )
     conn.commit()
     cur.close()
     conn.close()
-    return {"session_id": session_id, "payment_requested": True}
+    return {"session_id": session_id, "payment_requested": True, "payment_method": method}
 
 
 # ---------- Orders ----------
