@@ -287,6 +287,16 @@
         let currentTableId = null;
         let currentAlerts = [];
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
         function openAddTableModal() {
             currentTableId = null;
             document.getElementById("modalContent").innerHTML = `
@@ -346,8 +356,8 @@
             list.innerHTML = currentAlerts.map(a => `
                 <div class="notif-row" onclick="jumpToTable('${a.tableId}')">
                     <div class="info">
-                        <div class="table-name">${a.label}</div>
-                        <div class="type">${a.text}</div>
+                        <div class="table-name">${escapeHtml(a.label)}</div>
+                        <div class="type">${escapeHtml(a.text)}</div>
                     </div>
                     <div class="go">→</div>
                 </div>
@@ -397,13 +407,14 @@
 
                     tables.forEach(t => {
                         const label = t.display_label || t.table_id;
+                        const safeLabel = escapeHtml(label);
                         const session = sessionByTableId[t.table_id];
 
                         if (!session) {
                             grid.innerHTML += `
                                 <div class="card empty" onclick="openTableModal('${t.table_id}')">
                                     <div class="card-body">
-                                        <h3>${label}</h3>
+                                        <h3>${safeLabel}</h3>
                                         <div class="card-stats"><span class="stat empty-stat">🟢 Empty</span></div>
                                     </div>
                                 </div>
@@ -417,7 +428,7 @@
                                 <div class="card has-alert" onclick="openTableModal('${t.table_id}')">
                                     <div class="card-alert release">⏹️ NEEDS RELEASE</div>
                                     <div class="card-body">
-                                        <h3>${label}</h3>
+                                        <h3>${safeLabel}</h3>
                                         <div class="card-stats"><span class="stat">Session ${session.status.toLowerCase()}</span></div>
                                     </div>
                                 </div>
@@ -450,7 +461,7 @@
                             <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${t.table_id}')">
                                 ${bannerHtml}
                                 <div class="card-body">
-                                    <h3>${label}</h3>
+                                    <h3>${safeLabel}</h3>
                                     <div class="card-stats">
                                         <span class="stat">👥 ${session.party_size}</span>
                                         <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</span>
@@ -478,10 +489,11 @@
                 .then(tables => {
                     const table = tables.find(t => t.table_id === tableId);
                     const label = table ? (table.display_label || table.table_id) : tableId;
+                    const safeLabel = escapeHtml(label);
 
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
-                            <h2>${label}</h2>
+                            <h2>${safeLabel}</h2>
                             <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
                             <input type="number" id="quickPartySize" placeholder="party size" value="2" style="width:120px;">
                             <div style="margin-top:12px;"><button class="success" onclick="openSessionForCurrentTable()">Open Session</button></div>
@@ -496,7 +508,7 @@
                         .then(session => {
                             if (session.error || session.status !== "OPEN") {
                                 content.innerHTML = `
-                                    <h2>${label}</h2>
+                                    <h2>${safeLabel}</h2>
                                     <p style="color:#777; font-weight:600; margin:12px 0;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
                                     <p id="modalResult"></p>
@@ -513,7 +525,7 @@
                                     let ordersHtml = orders.length
                                         ? orders.map(o => `
                                             <div class="order-line">
-                                                <div class="info">${statusEmoji[o.status] || ""} ${o.qty}x ${o.item} — €${(o.price * o.qty).toFixed(2)}</div>
+                                                <div class="info">${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}</div>
                                                 <div class="actions">
                                                     ${o.status === "PENDING_REVIEW" ? `
                                                         <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
@@ -534,7 +546,7 @@
                                     }
 
                                     content.innerHTML = `
-                                        <h2>${label}</h2>
+                                        <h2>${safeLabel}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">Customer link ↗</a></p>
                                         ${alerts}

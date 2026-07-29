@@ -346,6 +346,16 @@
         let menu = {};
         let cart = {};
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
         function getPrice(item) {
             const data = menu[item];
             return typeof data === "object" ? data.price : data;
@@ -428,10 +438,10 @@
                 const image = getImage(item);
                 const description = getDescription(item);
                 const imageHtml = image
-                    ? `<img src="${image}" class="item-photo" onerror="this.outerHTML='<div class=\\'item-photo-fallback\\'>🍽️</div>'">`
+                    ? `<img src="${escapeHtml(image)}" class="item-photo" onerror="this.outerHTML='<div class=\\'item-photo-fallback\\'>🍽️</div>'">`
                     : `<div class="item-photo-fallback">🍽️</div>`;
                 const descriptionHtml = description
-                    ? `<div class="description">${description}</div>`
+                    ? `<div class="description">${escapeHtml(description)}</div>`
                     : "";
                 itemsHtml += `
                     <div class="menu-item">
@@ -440,7 +450,7 @@
                             <span class="item-qty-badge" id="badge-${item}"></span>
                         </div>
                         <div class="item-info">
-                            <div class="name">${capitalize(item)}</div>
+                            <div class="name">${escapeHtml(capitalize(item))}</div>
                             ${descriptionHtml}
                             <div class="price">€${Number(price).toFixed(2)}</div>
                         </div>
@@ -553,7 +563,7 @@
             div.innerHTML = items.length
                 ? items.map(item => `
                     <div class="cart-line">
-                        <span class="item-name">${capitalize(item)}</span>
+                        <span class="item-name">${escapeHtml(capitalize(item))}</span>
                         <span class="qty-controls">
                             <button onclick="changeQty('${item}', -1)">−</button>
                             <span class="qty-num">${cart[item]}</span>
@@ -603,7 +613,7 @@
                     div.innerHTML = orders.length
                         ? orders.map(o => `
                             <div class="order-status">
-                                <span class="item-name">${o.qty}x ${capitalize(o.item)}</span>
+                                <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
                                 <span class="pill ${o.status}">${o.status.replace("_", " ")}</span>
                             </div>
                         `).join("")

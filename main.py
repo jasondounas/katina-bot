@@ -61,7 +61,6 @@ def init_db():
     """)
     conn.commit()
 
-    # Migration: add any columns missing from an older version of "sessions"
     for column_def in ["waiter_called INTEGER DEFAULT 0", "payment_requested INTEGER DEFAULT 0"]:
         try:
             cur.execute(f"ALTER TABLE sessions ADD COLUMN {column_def}")
@@ -69,7 +68,6 @@ def init_db():
         except psycopg2.errors.DuplicateColumn:
             conn.rollback()
 
-    # Migration: idempotency key column + unique index, for orders
     try:
         cur.execute("ALTER TABLE orders ADD COLUMN idempotency_key TEXT")
         conn.commit()
@@ -110,6 +108,9 @@ def get_menu():
 
 @app.post("/tables")
 def create_table(table_id: str, display_label: str = None):
+    if not table_id or not table_id.strip():
+        return {"error": "Table id cannot be empty"}
+
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
@@ -214,6 +215,9 @@ def list_sessions(status: str = "OPEN"):
 
 @app.post("/sessions/open")
 def open_session(table_id: str, party_size: int):
+    if party_size < 1:
+        return {"error": "Party size must be at least 1"}
+
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
@@ -250,6 +254,9 @@ def open_session(table_id: str, party_size: int):
 
 @app.post("/sessions/{session_id}/update-party-size")
 def update_party_size(session_id: str, party_size: int):
+    if party_size < 1:
+        return {"error": "Party size must be at least 1"}
+
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -477,6 +484,9 @@ def get_price_from_pda(item: str) -> float:
 
 @app.post("/orders")
 def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None):
+    if qty < 1:
+        return {"error": "Quantity must be at least 1"}
+
     conn = get_connection()
     cur = get_cursor(conn)
 
