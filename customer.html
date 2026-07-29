@@ -17,10 +17,11 @@
             padding: 28px 24px 20px;
             color: white;
         }
-        header .brand {
-            display: flex; align-items: center; gap: 14px;
+        header .top-row {
+            display: flex; justify-content: space-between; align-items: flex-start;
             max-width: 900px; margin: 0 auto;
         }
+        header .brand { display: flex; align-items: center; gap: 14px; }
         header .logo {
             width: 52px; height: 52px;
             background: linear-gradient(135deg, #ff6b35, #f7931e);
@@ -31,6 +32,16 @@
         }
         header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
         header .sub { font-size: 14px; color: #ffb088; margin-top: 3px; font-weight: 600; }
+        .lang-toggle {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
 
         .hero {
             background: linear-gradient(135deg, #2a9d8f, #1d7d72);
@@ -297,30 +308,33 @@
 <body>
 
     <header>
-        <div class="brand">
-            <div class="logo">🍽️</div>
-            <div>
-                <h1>Katina</h1>
-                <div class="sub" id="tableLabel">Loading table...</div>
+        <div class="top-row">
+            <div class="brand">
+                <div class="logo">🍽️</div>
+                <div>
+                    <h1>Katina</h1>
+                    <div class="sub" id="tableLabel">...</div>
+                </div>
             </div>
+            <button class="lang-toggle" onclick="toggleLang()" id="langToggle">🇬🇷 EN</button>
         </div>
     </header>
 
     <div class="hero">
         <div class="hero-inner">
-            <div class="tagline">What are you craving today?</div>
-            <div class="tagline-sub">Fresh picks, made to order, straight to your table</div>
+            <div class="tagline" id="heroTagline"></div>
+            <div class="tagline-sub" id="heroSub"></div>
         </div>
     </div>
 
     <div class="container" id="app">
-        <p style="text-align:center; color:#999; margin-top:40px;">Loading...</p>
+        <p style="text-align:center; color:#999; margin-top:40px;" id="loadingText">Loading...</p>
     </div>
 
     <div class="cart-bar empty" id="cartBar" onclick="openCartSheet()">
         <div class="left">
             <div class="count" id="cartCount">0</div>
-            <span id="cartSummary">View cart</span>
+            <span id="cartSummary"></span>
         </div>
         <span class="arrow">→</span>
     </div>
@@ -330,9 +344,9 @@
             <div class="sheet-content">
                 <span class="close-sheet" onclick="closeCartSheet()">✕</span>
                 <div class="sheet-handle"></div>
-                <h2>Your Cart</h2>
+                <h2 id="cartTitle"></h2>
                 <div id="cartLines"></div>
-                <button class="submit-btn" onclick="submitCart()">Send Order to Waiter</button>
+                <button class="submit-btn" id="submitBtnMain" onclick="submitCart()"></button>
             </div>
         </div>
     </div>
@@ -346,14 +360,85 @@
         let menu = {};
         let cart = {};
 
-        function escapeHtml(str) {
-            if (str === null || str === undefined) return "";
-            return String(str)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#39;");
+        // ---------- Language ----------
+        const T = {
+            en: {
+                loading: "Loading...",
+                noTable: "No table found in the link.<br>Please scan the QR code on your table.",
+                noTableLinked: "No table linked",
+                table: "Table",
+                welcomeStaff: "👋 Welcome! A member of staff will be with you shortly to get you started.",
+                menuLoadError: "Couldn't load the menu right now. Please try refreshing.",
+                menuEmpty: "The menu is empty right now.",
+                menuTitle: "Menu",
+                callWaiter: "🔔 Call Waiter",
+                waiterNotified: "🔔 Waiter notified",
+                requestBill: "💳 Request the Bill",
+                billRequested: "💳 Bill requested",
+                yourOrders: "Your Orders",
+                noOrdersYet: "No orders yet.",
+                viewCart: "View cart",
+                yourCart: "Your Cart",
+                cartEmpty: "Your cart is empty.",
+                sendOrder: "Send Order to Waiter",
+                sending: "Sending...",
+                somethingWrong: "Something went wrong — please try again.",
+                heroTitle: "What are you craving today?",
+                heroSub: "Fresh picks, made to order, straight to your table",
+                pillStatus: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" }
+            },
+            gr: {
+                loading: "Φόρτωση...",
+                noTable: "Δεν βρέθηκε τραπέζι στον σύνδεσμο.<br>Παρακαλώ σκανάρετε το QR στο τραπέζι σας.",
+                noTableLinked: "Δεν έχει συνδεθεί τραπέζι",
+                table: "Τραπέζι",
+                welcomeStaff: "👋 Καλωσήρθατε! Ένας υπάλληλος θα έρθει σύντομα να σας εξυπηρετήσει.",
+                menuLoadError: "Δεν ήταν δυνατή η φόρτωση του μενού. Δοκιμάστε ξανά.",
+                menuEmpty: "Το μενού είναι άδειο αυτή τη στιγμή.",
+                menuTitle: "Μενού",
+                callWaiter: "🔔 Κάλεσε Σερβιτόρο",
+                waiterNotified: "🔔 Ο σερβιτόρος ειδοποιήθηκε",
+                requestBill: "💳 Ζήτα τον Λογαριασμό",
+                billRequested: "💳 Ζητήθηκε ο λογαριασμός",
+                yourOrders: "Οι Παραγγελίες σας",
+                noOrdersYet: "Δεν υπάρχουν παραγγελίες ακόμα.",
+                viewCart: "Δες το καλάθι",
+                yourCart: "Το Καλάθι σας",
+                cartEmpty: "Το καλάθι σας είναι άδειο.",
+                sendOrder: "Στείλε Παραγγελία",
+                sending: "Αποστολή...",
+                somethingWrong: "Κάτι πήγε στραβά — δοκιμάστε ξανά.",
+                heroTitle: "Τι λαχταράτε σήμερα;",
+                heroSub: "Φρέσκες επιλογές, φτιαγμένες κατόπιν παραγγελίας",
+                pillStatus: { PENDING_REVIEW: "ΣΕ ΑΝΑΜΟΝΗ", APPROVED: "ΕΓΚΡΙΘΗΚΕ", REJECTED: "ΑΠΟΡΡΙΦΘΗΚΕ", CANCELLED: "ΑΚΥΡΩΘΗΚΕ" }
+            }
+        };
+
+        function getLang() {
+            return localStorage.getItem("katinaLang") || "gr";
+        }
+
+        function toggleLang() {
+            const newLang = getLang() === "gr" ? "en" : "gr";
+            localStorage.setItem("katinaLang", newLang);
+            applyStaticText();
+            if (menu && Object.keys(menu).length) renderMenu();
+            if (sessionId) loadMyOrders();
+        }
+
+        function t(key) {
+            return T[getLang()][key];
+        }
+
+        function applyStaticText() {
+            const lang = getLang();
+            document.getElementById("langToggle").innerText = lang === "gr" ? "🇬🇧 EN" : "🇬🇷 GR";
+            document.getElementById("heroTagline").innerText = t("heroTitle");
+            document.getElementById("heroSub").innerText = t("heroSub");
+            document.getElementById("cartTitle").innerText = t("yourCart");
+            document.getElementById("submitBtnMain").innerText = t("sendOrder");
+            document.getElementById("cartSummary").innerText = t("viewCart");
+            document.getElementById("loadingText").innerText = t("loading");
         }
 
         function getPrice(item) {
@@ -374,16 +459,24 @@
             return "key_" + Date.now() + "_" + Math.random().toString(36).slice(2);
         }
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
         function init() {
+            applyStaticText();
             if (!tableId) {
-                document.getElementById("app").innerHTML = `
-                    <div class="missing-session">
-                        No table found in the link.<br>Please scan the QR code on your table.
-                    </div>`;
-                document.getElementById("tableLabel").innerText = "No table linked";
+                document.getElementById("app").innerHTML = `<div class="missing-session">${t("noTable")}</div>`;
+                document.getElementById("tableLabel").innerText = t("noTableLinked");
                 return;
             }
-            document.getElementById("tableLabel").innerText = "Table " + tableId;
+            document.getElementById("tableLabel").innerText = t("table") + " " + tableId;
             checkForSession();
         }
 
@@ -392,11 +485,7 @@
                 .then(r => r.json())
                 .then(data => {
                     if (!data.active) {
-                        document.getElementById("app").innerHTML = `
-                            <div class="missing-session">
-                                👋 Welcome! A member of staff will be with you shortly
-                                to get you started.
-                            </div>`;
+                        document.getElementById("app").innerHTML = `<div class="missing-session">${t("welcomeStaff")}</div>`;
                         setTimeout(checkForSession, 4000);
                         return;
                     }
@@ -416,10 +505,7 @@
                     renderMenu();
                 })
                 .catch(() => {
-                    document.getElementById("app").innerHTML = `
-                        <div class="missing-session">
-                            Couldn't load the menu right now. Please try refreshing.
-                        </div>`;
+                    document.getElementById("app").innerHTML = `<div class="missing-session">${t("menuLoadError")}</div>`;
                 });
         }
 
@@ -428,7 +514,7 @@
             const items = Object.keys(menu);
 
             if (items.length === 0) {
-                app.innerHTML = `<div class="missing-session">The menu is empty right now.</div>`;
+                app.innerHTML = `<div class="missing-session">${t("menuEmpty")}</div>`;
                 return;
             }
 
@@ -464,14 +550,14 @@
             });
 
             app.innerHTML = `
-                <div class="section-title"><span class="bar"></span>Menu</div>
+                <div class="section-title"><span class="bar"></span>${t("menuTitle")}</div>
                 <div class="menu-grid">${itemsHtml}</div>
                 <div class="action-buttons">
-                    <button class="call-btn" id="callBtn" onclick="callWaiter()">🔔 Call Waiter</button>
-                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">💳 Request the Bill</button>
+                    <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("callWaiter")}</button>
+                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">${t("requestBill")}</button>
                 </div>
-                <div class="section-title orders"><span class="bar"></span>Your Orders</div>
-                <div id="ordersList"><p class="empty-orders">No orders yet.</p></div>
+                <div class="section-title orders"><span class="bar"></span>${t("yourOrders")}</div>
+                <div id="ordersList"><p class="empty-orders">${t("noOrdersYet")}</p></div>
             `;
             updateItemBadges();
         }
@@ -483,14 +569,14 @@
         function callWaiter() {
             const btn = document.getElementById("callBtn");
             btn.disabled = true;
-            btn.innerText = "🔔 Waiter notified";
+            btn.innerText = t("waiterNotified");
             fetch(`${BASE}/sessions/${sessionId}/call-waiter`, { method: "POST" });
         }
 
         function requestPayment() {
             const btn = document.getElementById("payBtn");
             btn.disabled = true;
-            btn.innerText = "💳 Bill requested";
+            btn.innerText = t("billRequested");
             fetch(`${BASE}/sessions/${sessionId}/request-payment`, { method: "POST" });
         }
 
@@ -545,7 +631,7 @@
             } else {
                 bar.classList.remove("empty");
                 document.getElementById("cartCount").innerText = totalItems;
-                document.getElementById("cartSummary").innerText = "View cart";
+                document.getElementById("cartSummary").innerText = t("viewCart");
             }
         }
 
@@ -571,16 +657,16 @@
                         </span>
                     </div>
                 `).join("")
-                : "<p style='color:#999; padding:24px 0;'>Your cart is empty.</p>";
+                : `<p style='color:#999; padding:24px 0;'>${t("cartEmpty")}</p>`;
         }
 
         function submitCart() {
             const items = Object.keys(cart);
-            if (items.length === 0) return alert("Add something to your cart first.");
+            if (items.length === 0) return alert(t("cartEmpty"));
 
-            const submitBtn = document.querySelector(".submit-btn");
+            const submitBtn = document.getElementById("submitBtnMain");
             submitBtn.disabled = true;
-            submitBtn.innerText = "Sending...";
+            submitBtn.innerText = t("sending");
 
             const requests = items.map(item => {
                 const key = generateIdempotencyKey();
@@ -595,11 +681,11 @@
                 closeCartSheet();
                 loadMyOrders();
                 submitBtn.disabled = false;
-                submitBtn.innerText = "Send Order to Waiter";
+                submitBtn.innerText = t("sendOrder");
             }).catch(() => {
                 submitBtn.disabled = false;
-                submitBtn.innerText = "Send Order to Waiter";
-                alert("Something went wrong — please try again.");
+                submitBtn.innerText = t("sendOrder");
+                alert(t("somethingWrong"));
             });
         }
 
@@ -610,14 +696,15 @@
                 .then(orders => {
                     const div = document.getElementById("ordersList");
                     if (!div) return;
+                    const statusMap = t("pillStatus");
                     div.innerHTML = orders.length
                         ? orders.map(o => `
                             <div class="order-status">
                                 <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
-                                <span class="pill ${o.status}">${o.status.replace("_", " ")}</span>
+                                <span class="pill ${o.status}">${statusMap[o.status] || o.status}</span>
                             </div>
                         `).join("")
-                        : "<p class='empty-orders'>No orders yet.</p>";
+                        : `<p class='empty-orders'>${t("noOrdersYet")}</p>`;
                 });
         }
 
