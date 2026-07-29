@@ -192,6 +192,33 @@ def list_tables():
     return [dict(t) for t in tables]
 
 
+@app.delete("/tables/{table_id}")
+def delete_table(table_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    table = cur.fetchone()
+
+    if table is None:
+        cur.close()
+        conn.close()
+        return {"error": "Table not found"}
+
+    if table["active_session_id"] is not None:
+        cur.close()
+        conn.close()
+        return {"error": "Cannot delete a table with an active session — release it first"}
+
+    cur.execute("DELETE FROM tables WHERE table_id = %s", (table_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "deleted table", table_id)
+
+    return {"table_id": table_id, "deleted": True}
+
+
 @app.get("/tables/{table_id}/active-session")
 def get_active_session(table_id: str):
     conn = get_connection()
