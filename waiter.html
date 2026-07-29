@@ -78,8 +78,10 @@
             box-shadow: 0 6px 16px rgba(255,107,53,0.35);
         }
         header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+        header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
 
-        .bell-btn {
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .bell-btn, .log-btn {
             background: rgba(255,255,255,0.1);
             border: none;
             color: white;
@@ -152,6 +154,15 @@
         .notif-row .table-name { font-weight: 800; font-size: 15px; }
         .notif-row .type { font-size: 12.5px; color: #ff9d70; margin-top: 3px; }
         .notif-row .go { font-size: 18px; color: #ff6b35; }
+
+        .log-row {
+            background: rgba(255,255,255,0.06);
+            padding: 14px 16px; border-radius: 14px;
+            margin-bottom: 10px;
+        }
+        .log-row .waiter { color: #ff9d70; font-weight: 800; font-size: 13.5px; }
+        .log-row .action { color: white; font-size: 14px; margin-top: 3px; }
+        .log-row .time { color: #888; font-size: 11.5px; margin-top: 4px; }
 
         .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
 
@@ -298,7 +309,8 @@
         <div class="login-box">
             <div class="logo">🍽️</div>
             <h2>Staff Login</h2>
-            <p>Enter the staff code once — this device will remember it.</p>
+            <p>Enter the staff code and your name once — this device will remember them.</p>
+            <input type="text" id="nameInput" placeholder="Your name">
             <input type="password" id="loginInput" placeholder="Staff code" onkeydown="if(event.key==='Enter') doLogin()">
             <button onclick="doLogin()">Unlock</button>
             <div class="login-error" id="loginError"></div>
@@ -308,20 +320,35 @@
     <header>
         <div class="brand">
             <div class="logo">🍽️</div>
-            <h1>Katina — Waiter</h1>
+            <div>
+                <h1>Katina — Waiter</h1>
+                <div class="whoami" id="whoamiLabel"></div>
+            </div>
         </div>
-        <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
-            🔔 <span class="bell-count" id="bellCount">0</span>
-        </button>
+        <div class="header-actions">
+            <button class="log-btn" onclick="openActivityLog()">📋</button>
+            <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
+                🔔 <span class="bell-count" id="bellCount">0</span>
+            </button>
+        </div>
     </header>
 
-    <div class="drawer-overlay" id="drawerOverlay" onclick="closeNotifPanel()"></div>
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeAllDrawers()"></div>
+
     <div class="notif-drawer" id="notifDrawer">
         <div class="drawer-header">
             <h2>🔔 Notifications</h2>
-            <span class="drawer-close" onclick="closeNotifPanel()">✕</span>
+            <span class="drawer-close" onclick="closeAllDrawers()">✕</span>
         </div>
         <div id="notifList"></div>
+    </div>
+
+    <div class="notif-drawer" id="logDrawer">
+        <div class="drawer-header">
+            <h2>📋 Activity Log</h2>
+            <span class="drawer-close" onclick="closeAllDrawers()">✕</span>
+        </div>
+        <div id="logList"></div>
     </div>
 
     <div class="container">
@@ -347,9 +374,17 @@
         function getToken() {
             return localStorage.getItem("waiterToken");
         }
+        function getWaiterName() {
+            return localStorage.getItem("waiterName") || "Unknown";
+        }
 
         function doLogin() {
+            const name = document.getElementById("nameInput").value.trim();
             const code = document.getElementById("loginInput").value;
+            if (!name) {
+                document.getElementById("loginError").innerText = "Please enter your name.";
+                return;
+            }
             if (!code) return;
 
             fetch(`${BASE}/tables?table_id=__token_check__`, {
@@ -364,13 +399,18 @@
             }).then(data => {
                 if (!data) return;
                 localStorage.setItem("waiterToken", code);
+                localStorage.setItem("waiterName", name);
                 document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("whoamiLabel").innerText = "Logged in as " + name;
                 loadTables();
             });
         }
 
         function authHeaders() {
-            return { "X-Waiter-Token": getToken() };
+            return {
+                "X-Waiter-Token": getToken(),
+                "X-Waiter-Name": getWaiterName()
+            };
         }
 
         function escapeHtml(str) {
@@ -387,6 +427,40 @@
             if (method === "cash") return "💵 Cash";
             if (method === "card") return "💳 Card";
             return "";
+        }
+
+        // ---------- Activity Log ----------
+
+        function openActivityLog() {
+            document.getElementById("drawerOverlay").classList.add("open");
+            document.getElementById("logDrawer").classList.add("open");
+
+            fetch(`${BASE}/activity-log`, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(logs => {
+                    const list = document.getElementById("logList");
+                    if (!Array.isArray(logs) || logs.length === 0) {
+                        list.innerHTML = `<div class="notif-empty">No activity yet.</div>`;
+                        return;
+                    }
+                    list.innerHTML = logs.map(l => {
+                        const time = new Date(l.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        return `
+                            <div class="log-row">
+                                <div class="waiter">${escapeHtml(l.waiter_name)}</div>
+                                <div class="action">${escapeHtml(l.action)} — ${escapeHtml(l.target_id)}</div>
+                                <div class="time">${time}</div>
+                            </div>
+                        `;
+                    }).join("");
+                });
+        }
+
+        function closeAllDrawers() {
+            document.getElementById("notifDrawer").classList.remove("open");
+            document.getElementById("logDrawer").classList.remove("open");
+            document.getElementById("drawerOverlay").classList.remove("open");
+            document.getElementById("bellBtn").classList.remove("active");
         }
 
         function openAddTableModal() {
@@ -430,16 +504,11 @@
             const btn = document.getElementById("bellBtn");
             const isOpen = drawer.classList.contains("open");
 
+            document.getElementById("logDrawer").classList.remove("open");
             drawer.classList.toggle("open", !isOpen);
             overlay.classList.toggle("open", !isOpen);
             btn.classList.toggle("active", !isOpen);
             if (!isOpen) renderNotifPanel();
-        }
-
-        function closeNotifPanel() {
-            document.getElementById("notifDrawer").classList.remove("open");
-            document.getElementById("drawerOverlay").classList.remove("open");
-            document.getElementById("bellBtn").classList.remove("active");
         }
 
         function renderNotifPanel() {
@@ -460,7 +529,7 @@
         }
 
         function jumpToTable(tableId) {
-            closeNotifPanel();
+            closeAllDrawers();
             openTableModal(tableId);
         }
 
@@ -778,6 +847,7 @@
 
         if (getToken()) {
             document.getElementById("loginScreen").style.display = "none";
+            document.getElementById("whoamiLabel").innerText = "Logged in as " + getWaiterName();
             loadTables();
         }
         setInterval(loadTables, 5000);
