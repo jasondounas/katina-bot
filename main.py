@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import os
@@ -17,6 +17,13 @@ app.add_middleware(
 
 PDA_URL = "https://katina-bot-1.onrender.com"
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+WAITER_TOKEN = os.environ.get("WAITER_TOKEN", "changeme")
+
+
+def verify_waiter(x_waiter_token: str = Header(None)):
+    if x_waiter_token != WAITER_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing waiter token")
 
 
 def get_connection():
@@ -107,7 +114,7 @@ def get_menu():
 # ---------- Tables (permanent) ----------
 
 @app.post("/tables")
-def create_table(table_id: str, display_label: str = None):
+def create_table(table_id: str, display_label: str = None, _auth: None = Depends(verify_waiter)):
     if not table_id or not table_id.strip():
         return {"error": "Table id cannot be empty"}
 
@@ -155,7 +162,7 @@ def get_active_session(table_id: str):
 
 
 @app.post("/tables/{table_id}/release")
-def release_table(table_id: str):
+def release_table(table_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
@@ -214,7 +221,7 @@ def list_sessions(status: str = "OPEN"):
 
 
 @app.post("/sessions/open")
-def open_session(table_id: str, party_size: int):
+def open_session(table_id: str, party_size: int, _auth: None = Depends(verify_waiter)):
     if party_size < 1:
         return {"error": "Party size must be at least 1"}
 
@@ -253,7 +260,7 @@ def open_session(table_id: str, party_size: int):
 
 
 @app.post("/sessions/{session_id}/update-party-size")
-def update_party_size(session_id: str, party_size: int):
+def update_party_size(session_id: str, party_size: int, _auth: None = Depends(verify_waiter)):
     if party_size < 1:
         return {"error": "Party size must be at least 1"}
 
@@ -284,7 +291,7 @@ def update_party_size(session_id: str, party_size: int):
 
 
 @app.delete("/sessions/{session_id}")
-def delete_session(session_id: str):
+def delete_session(session_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -358,7 +365,7 @@ def calculate_split(session_id: str):
 
 
 @app.post("/sessions/{session_id}/mark-paid")
-def mark_paid(session_id: str):
+def mark_paid(session_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -381,7 +388,7 @@ def mark_paid(session_id: str):
 
 
 @app.post("/sessions/{session_id}/close")
-def close_session(session_id: str):
+def close_session(session_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -428,7 +435,7 @@ def call_waiter(session_id: str):
 
 
 @app.post("/sessions/{session_id}/acknowledge-call")
-def acknowledge_call(session_id: str):
+def acknowledge_call(session_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("UPDATE sessions SET waiter_called = 0 WHERE session_id = %s", (session_id,))
@@ -545,7 +552,7 @@ def send_kitchen_ticket(order_id: str, item: str, qty: int) -> str:
 
 
 @app.post("/orders/{order_id}/approve")
-def approve_order(order_id: str):
+def approve_order(order_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
@@ -576,7 +583,7 @@ def approve_order(order_id: str):
 
 
 @app.post("/orders/{order_id}/reject")
-def reject_order(order_id: str):
+def reject_order(order_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
@@ -601,7 +608,7 @@ def reject_order(order_id: str):
 
 
 @app.delete("/orders/{order_id}")
-def delete_order(order_id: str):
+def delete_order(order_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
