@@ -11,6 +11,52 @@
             color: #1a1a1a;
         }
 
+        .login-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .login-box {
+            background: white;
+            border-radius: 24px;
+            padding: 36px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+        }
+        .login-box .logo {
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 20px;
+        }
+        .login-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+        .login-box p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .login-box input {
+            width: 100%;
+            padding: 14px;
+            border: 1.5px solid #eee;
+            border-radius: 12px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .login-box button {
+            width: 100%;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
         header {
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
             padding: 20px 24px;
@@ -248,6 +294,17 @@
 </head>
 <body>
 
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <div class="logo">🍽️</div>
+            <h2>Staff Login</h2>
+            <p>Enter the staff code once — this device will remember it.</p>
+            <input type="password" id="loginInput" placeholder="Staff code" onkeydown="if(event.key==='Enter') doLogin()">
+            <button onclick="doLogin()">Unlock</button>
+            <div class="login-error" id="loginError"></div>
+        </div>
+    </div>
+
     <header>
         <div class="brand">
             <div class="logo">🍽️</div>
@@ -287,6 +344,32 @@
         let currentTableId = null;
         let currentAlerts = [];
 
+        function getToken() {
+            return localStorage.getItem("waiterToken");
+        }
+
+        function doLogin() {
+            const code = document.getElementById("loginInput").value;
+            if (!code) return;
+
+            fetch(`${BASE}/tables?table_id=__token_check__`, {
+                method: "POST",
+                headers: { "X-Waiter-Token": code }
+            }).then(r => r.json()).then(data => {
+                if (data.error === "Invalid or missing waiter token") {
+                    document.getElementById("loginError").innerText = "Incorrect code, try again.";
+                    return;
+                }
+                localStorage.setItem("waiterToken", code);
+                document.getElementById("loginScreen").style.display = "none";
+                loadTables();
+            });
+        }
+
+        function authHeaders() {
+            return { "X-Waiter-Token": getToken() };
+        }
+
         function escapeHtml(str) {
             if (str === null || str === undefined) return "";
             return String(str)
@@ -317,7 +400,10 @@
             const label = document.getElementById("newTableLabel").value;
             if (!tableId) return alert("Enter a table id");
 
-            fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, { method: "POST" })
+            fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) {
@@ -570,7 +656,10 @@
         function openSessionForCurrentTable() {
             const partySize = document.getElementById("quickPartySize").value;
 
-            fetch(`${BASE}/sessions/open?table_id=${currentTableId}&party_size=${partySize}`, { method: "POST" })
+            fetch(`${BASE}/sessions/open?table_id=${currentTableId}&party_size=${partySize}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) {
@@ -593,19 +682,28 @@
                 .then(tables => {
                     const table = tables.find(t => t.table_id === currentTableId);
                     if (!table || !table.active_session_id) return;
-                    fetch(`${BASE}/sessions/${table.active_session_id}/acknowledge-call`, { method: "POST" })
+                    fetch(`${BASE}/sessions/${table.active_session_id}/acknowledge-call`, {
+                        method: "POST",
+                        headers: authHeaders()
+                    })
                         .then(() => { openTableModal(currentTableId); loadTables(); });
                 });
         }
 
         function approveOrder(orderId) {
-            fetch(`${BASE}/orders/${orderId}/approve`, { method: "POST" })
+            fetch(`${BASE}/orders/${orderId}/approve`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(() => { openTableModal(currentTableId); loadTables(); });
         }
 
         function rejectOrder(orderId) {
-            fetch(`${BASE}/orders/${orderId}/reject`, { method: "POST" })
+            fetch(`${BASE}/orders/${orderId}/reject`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(() => { openTableModal(currentTableId); loadTables(); });
         }
@@ -620,13 +718,19 @@
         }
 
         function markPaid(sessionId) {
-            fetch(`${BASE}/sessions/${sessionId}/mark-paid`, { method: "POST" })
+            fetch(`${BASE}/sessions/${sessionId}/mark-paid`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(() => { openTableModal(currentTableId); loadTables(); });
         }
 
         function closeSession(sessionId) {
-            fetch(`${BASE}/sessions/${sessionId}/close`, { method: "POST" })
+            fetch(`${BASE}/sessions/${sessionId}/close`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(data => {
                     document.getElementById("modalResult").innerText = data.error || "Session closed. You can release the table now.";
@@ -637,13 +741,19 @@
 
         function deleteSession(sessionId) {
             if (!confirm("Delete this session? This cancels all its orders.")) return;
-            fetch(`${BASE}/sessions/${sessionId}`, { method: "DELETE" })
+            fetch(`${BASE}/sessions/${sessionId}`, {
+                method: "DELETE",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(() => { openTableModal(currentTableId); loadTables(); });
         }
 
         function releaseTable(tableId) {
-            fetch(`${BASE}/tables/${tableId}/release`, { method: "POST" })
+            fetch(`${BASE}/tables/${tableId}/release`, {
+                method: "POST",
+                headers: authHeaders()
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.error) {
@@ -655,7 +765,10 @@
                 });
         }
 
-        loadTables();
+        if (getToken()) {
+            document.getElementById("loginScreen").style.display = "none";
+            loadTables();
+        }
         setInterval(loadTables, 5000);
     </script>
 </body>
