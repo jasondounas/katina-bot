@@ -380,6 +380,12 @@
                 .replace(/'/g, "&#39;");
         }
 
+        function paymentMethodLabel(method) {
+            if (method === "cash") return "💵 Cash";
+            if (method === "card") return "💳 Card";
+            return "";
+        }
+
         function openAddTableModal() {
             currentTableId = null;
             document.getElementById("modalContent").innerHTML = `
@@ -530,8 +536,9 @@
                             bannerClass = "called"; bannerText = "🔔 CALLING WAITER";
                             currentAlerts.push({ tableId: t.table_id, label, text: "Called for a waiter" });
                         } else if (session.payment_requested) {
-                            bannerClass = "pay"; bannerText = "💳 WANTS TO PAY";
-                            currentAlerts.push({ tableId: t.table_id, label, text: "Requested the bill" });
+                            const methodLabel = paymentMethodLabel(session.payment_method);
+                            bannerClass = "pay"; bannerText = `💳 WANTS TO PAY${methodLabel ? " — " + methodLabel : ""}`;
+                            currentAlerts.push({ tableId: t.table_id, label, text: `Requested the bill${methodLabel ? " (" + methodLabel + ")" : ""}` });
                         } else if (pending > 0) {
                             bannerClass = "pending"; bannerText = `🧾 ${pending} NEW ORDER${pending > 1 ? "S" : ""}`;
                         }
@@ -628,7 +635,8 @@
                                             <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">Acknowledge</button></p>`;
                                     }
                                     if (session.payment_requested) {
-                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">💳 This table requested the bill.</p>`;
+                                        const methodLabel = paymentMethodLabel(session.payment_method);
+                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">💳 This table requested the bill${methodLabel ? " — " + methodLabel : ""}.</p>`;
                                     }
 
                                     content.innerHTML = `
