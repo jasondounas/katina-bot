@@ -429,8 +429,6 @@
             return "";
         }
 
-        // ---------- Activity Log ----------
-
         function openActivityLog() {
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
@@ -661,7 +659,10 @@
                             <h2>${safeLabel}</h2>
                             <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
                             <input type="number" id="quickPartySize" placeholder="party size" value="2" style="width:120px;">
-                            <div style="margin-top:12px;"><button class="success" onclick="openSessionForCurrentTable()">Open Session</button></div>
+                            <div style="margin-top:12px;">
+                                <button class="success" onclick="openSessionForCurrentTable()">Open Session</button>
+                                <button class="danger" onclick="deleteTable('${tableId}')">Delete Table</button>
+                            </div>
                             <p id="modalResult"></p>
                         `;
                         if (!silent) document.getElementById("overlay").style.display = "flex";
@@ -747,6 +748,23 @@
                         return;
                     }
                     openTableModal(currentTableId);
+                    loadTables();
+                });
+        }
+
+        function deleteTable(tableId) {
+            if (!confirm(`Permanently delete table "${tableId}"? This cannot be undone.`)) return;
+            fetch(`${BASE}/tables/${tableId}`, {
+                method: "DELETE",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    closeModal();
                     loadTables();
                 });
         }
