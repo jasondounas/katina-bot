@@ -26,6 +26,10 @@ def verify_waiter(x_waiter_token: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing waiter token")
 
 
+def get_waiter_name(x_waiter_name: str = Header(None)) -> str:
+    return x_waiter_name or "Unknown"
+
+
 def get_connection():
     conn = psycopg2.connect(DATABASE_URL)
     return conn
@@ -33,6 +37,18 @@ def get_connection():
 
 def get_cursor(conn):
     return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+def log_action(waiter_name: str, action: str, target_id: str):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute(
+        "INSERT INTO action_log (waiter_name, action, target_id) VALUES (%s, %s, %s)",
+        (waiter_name, action, target_id),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 def init_db():
@@ -64,6 +80,15 @@ def init_db():
             qty INTEGER,
             price REAL,
             status TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS action_log (
+            id SERIAL PRIMARY KEY,
+            waiter_name TEXT,
+            action TEXT,
+            target_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
@@ -117,10 +142,21 @@ def get_menu():
         return {}
 
 
+@app.get("/activity-log")
+def get_activity_log(_auth: None = Depends(verify_waiter)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM action_log ORDER BY created_at DESC LIMIT 50")
+    logs = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(l) for l in logs]
+
+
 # ---------- Tables (permanent) ----------
 
 @app.post("/tables")
-def create_table(table_id: str, display_label: str = None, _auth: None = Depends(verify_waiter)):
+def create_table(table_id: str, display_label: str = None, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     if not table_id or not table_id.strip():
         return {"error": "Table id cannot be empty"}
 
@@ -139,6 +175,9 @@ def create_table(table_id: str, display_label: str = None, _auth: None = Depends
     conn.commit()
     cur.close()
     conn.close()
+
+    log_action(waiter_name, "registered table", table_id)
+
     return {"table_id": table_id, "display_label": display_label or table_id}
 
 
@@ -168,7 +207,7 @@ def get_active_session(table_id: str):
 
 
 @app.post("/tables/{table_id}/release")
-def release_table(table_id: str, _auth: None = Depends(verify_waiter)):
+def release_table(table_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
@@ -196,6 +235,9 @@ def release_table(table_id: str, _auth: None = Depends(verify_waiter)):
     conn.commit()
     cur.close()
     conn.close()
+
+    log_action(waiter_name, "released table", table_id)
+
     return {"table_id": table_id, "released": True}
 
 
@@ -227,7 +269,7 @@ def list_sessions(status: str = "OPEN"):
 
 
 @app.post("/sessions/open")
-def open_session(table_id: str, party_size: int, _auth: None = Depends(verify_waiter)):
+def open_session(table_id: str, party_size: int, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     if party_size < 1:
         return {"error": "Party size must be at least 1"}
 
@@ -256,6 +298,8 @@ def open_session(table_id: str, party_size: int, _auth: None = Depends(verify_wa
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "opened session", session_id)
+
     return {
         "session_id": session_id,
         "table_id": table_id,
@@ -266,7 +310,7 @@ def open_session(table_id: str, party_size: int, _auth: None = Depends(verify_wa
 
 
 @app.post("/sessions/{session_id}/update-party-size")
-def update_party_size(session_id: str, party_size: int, _auth: None = Depends(verify_waiter)):
+def update_party_size(session_id: str, party_size: int, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     if party_size < 1:
         return {"error": "Party size must be at least 1"}
 
@@ -293,11 +337,13 @@ def update_party_size(session_id: str, party_size: int, _auth: None = Depends(ve
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "updated party size", session_id)
+
     return {"session_id": session_id, "party_size": party_size}
 
 
 @app.delete("/sessions/{session_id}")
-def delete_session(session_id: str, _auth: None = Depends(verify_waiter)):
+def delete_session(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -321,6 +367,8 @@ def delete_session(session_id: str, _auth: None = Depends(verify_waiter)):
     conn.commit()
     cur.close()
     conn.close()
+
+    log_action(waiter_name, "deleted session", session_id)
 
     return {"session_id": session_id, "status": "DELETED"}
 
@@ -371,7 +419,7 @@ def calculate_split(session_id: str):
 
 
 @app.post("/sessions/{session_id}/mark-paid")
-def mark_paid(session_id: str, _auth: None = Depends(verify_waiter)):
+def mark_paid(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -390,11 +438,13 @@ def mark_paid(session_id: str, _auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "marked paid", session_id)
+
     return {"session_id": session_id, "is_paid": True}
 
 
 @app.post("/sessions/{session_id}/close")
-def close_session(session_id: str, _auth: None = Depends(verify_waiter)):
+def close_session(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
@@ -420,6 +470,8 @@ def close_session(session_id: str, _auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "closed session", session_id)
+
     return {"session_id": session_id, "status": "CLOSED"}
 
 
@@ -441,13 +493,16 @@ def call_waiter(session_id: str):
 
 
 @app.post("/sessions/{session_id}/acknowledge-call")
-def acknowledge_call(session_id: str, _auth: None = Depends(verify_waiter)):
+def acknowledge_call(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("UPDATE sessions SET waiter_called = 0 WHERE session_id = %s", (session_id,))
     conn.commit()
     cur.close()
     conn.close()
+
+    log_action(waiter_name, "acknowledged call", session_id)
+
     return {"session_id": session_id, "waiter_called": False}
 
 
@@ -561,7 +616,7 @@ def send_kitchen_ticket(order_id: str, item: str, qty: int) -> str:
 
 
 @app.post("/orders/{order_id}/approve")
-def approve_order(order_id: str, _auth: None = Depends(verify_waiter)):
+def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
@@ -584,6 +639,8 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "approved order", order_id)
+
     return {
         "order_id": order_id,
         "status": "APPROVED",
@@ -592,7 +649,7 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter)):
 
 
 @app.post("/orders/{order_id}/reject")
-def reject_order(order_id: str, _auth: None = Depends(verify_waiter)):
+def reject_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
@@ -613,11 +670,13 @@ def reject_order(order_id: str, _auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
 
+    log_action(waiter_name, "rejected order", order_id)
+
     return {"order_id": order_id, "status": "REJECTED"}
 
 
 @app.delete("/orders/{order_id}")
-def delete_order(order_id: str, _auth: None = Depends(verify_waiter)):
+def delete_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
@@ -637,5 +696,7 @@ def delete_order(order_id: str, _auth: None = Depends(verify_waiter)):
     conn.commit()
     cur.close()
     conn.close()
+
+    log_action(waiter_name, "deleted order", order_id)
 
     return {"order_id": order_id, "deleted": True}
