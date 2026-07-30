@@ -696,7 +696,7 @@
                                                     ${o.status === "PENDING_REVIEW" ? `
                                                         <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
                                                         <button class="danger" onclick="rejectOrder('${o.order_id}')">Reject</button>
-                                                    ` : `<span style="font-size:12px;color:#999;">${o.status}</span>`}
+                                                    ` : `<span style="font-size:12px;color:#999;">${o.status}${o.handled_by ? ' by ' + escapeHtml(o.handled_by) : ''}</span>`}
                                                 </div>
                                             </div>
                                         `).join("")
