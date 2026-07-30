@@ -113,6 +113,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN handled_by TEXT")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("""
             CREATE UNIQUE INDEX idx_orders_idempotency
             ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL
@@ -661,7 +667,7 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
 
     kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"])
 
-    cur.execute("UPDATE orders SET status = %s WHERE order_id = %s", ("APPROVED", order_id))
+    cur.execute("UPDATE orders SET status = %s, handled_by = %s WHERE order_id = %s", ("APPROVED", waiter_name, order_id))
     conn.commit()
     cur.close()
     conn.close()
@@ -692,7 +698,7 @@ def reject_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_nam
         conn.close()
         return {"error": "Order already processed"}
 
-    cur.execute("UPDATE orders SET status = %s WHERE order_id = %s", ("REJECTED", order_id))
+    cur.execute("UPDATE orders SET status = %s, handled_by = %s WHERE order_id = %s", ("REJECTED", waiter_name, order_id))
     conn.commit()
     cur.close()
     conn.close()
