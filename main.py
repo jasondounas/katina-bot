@@ -91,6 +91,16 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS menu_items (
+            item_id TEXT PRIMARY KEY,
+            name TEXT,
+            price REAL,
+            description TEXT,
+            image TEXT,
+            available INTEGER DEFAULT 1
+        )
+    """)
     conn.commit()
 
     for column_def in ["waiter_called INTEGER DEFAULT 0", "payment_requested INTEGER DEFAULT 0"]:
