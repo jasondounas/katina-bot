@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Katina — Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background: #f7f5f2;
+            color: #1a1a1a;
+        }
+
+        .login-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .login-box {
+            background: white;
+            border-radius: 24px;
+            padding: 36px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+        }
+        .login-box .logo {
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px;
+            margin: 0 auto 20px;
+        }
+        .login-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+        .login-box p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .login-box input {
+            width: 100%;
+            padding: 14px;
+            border: 1.5px solid #eee;
+            border-radius: 12px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .login-box button {
+            width: 100%;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+        header {
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            padding: 20px 24px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .brand { display: flex; align-items: center; gap: 14px; }
+        .logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 6px 16px rgba(255,107,53,0.35);
+        }
+        header h1 { font-size: 20px; font-weight: 800; }
+        header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
+
+        .container { padding: 24px; max-width: 900px; margin: 0 auto; }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 32px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+        }
+        .stat-card .num { font-size: 28px; font-weight: 800; color: #ff6b35; }
+        .stat-card .label { font-size: 13px; color: #777; margin-top: 4px; font-weight: 600; }
+
+        .section-title {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 22px; font-weight: 800;
+            margin: 8px 0 18px;
+        }
+        .section-title .bar {
+            width: 5px; height: 22px; border-radius: 3px;
+            background: #ff6b35;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        button {
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        button.danger { background: #e74c3c; }
+        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+        button.secondary { background: #f0f0f0; color: #555; }
+
+        .menu-item-row {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        }
+        .menu-item-row.unavailable { opacity: 0.5; }
+        .item-thumb {
+            width: 54px; height: 54px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: #f0f0f0;
+            flex-shrink: 0;
+        }
+        .item-info { flex: 1; min-width: 0; }
+        .item-info .name { font-weight: 700; font-size: 15px; }
+        .item-info .price { color: #ff6b35; font-weight: 700; font-size: 13px; margin-top: 2px; }
+        .item-info .desc { font-size: 12px; color: #999; margin-top: 2px; }
+        .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+        .add-form {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+        }
+        .add-form input {
+            padding: 10px 12px;
+            border: 1.5px solid #eee;
+            border-radius: 10px;
+            font-size: 14px;
+            margin: 6px 6px 6px 0;
+        }
+        #itemId, #itemName { width: 140px; }
+        #itemPrice { width: 90px; }
+        #itemDesc, #itemImage { width: 220px; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed; top:0; left:0; right:0; bottom:0;
+            background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center;
+            z-index: 50;
+        }
+        .edit-modal {
+            background: white; border-radius: 20px; padding: 24px;
+            width: 90%; max-width: 420px;
+        }
+        .edit-modal h3 { margin-bottom: 14px; }
+        .edit-modal input {
+            width: 100%; padding: 10px 12px; margin-bottom: 10px;
+            border: 1.5px solid #eee; border-radius: 10px; font-size: 14px;
+        }
+        .edit-modal label { font-size: 12px; color: #777; font-weight: 700; display:block; margin-bottom:4px; }
+    </style>
+</head>
+<body>
+
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <div class="logo">🍽️</div>
+            <h2>Staff Login</h2>
+            <p>Enter the staff code and your name once — this device will remember them.</p>
+            <input type="text" id="nameInput" placeholder="Your name">
+            <input type="password" id="loginInput" placeholder="Staff code" onkeydown="if(event.key==='Enter') doLogin()">
+            <button onclick="doLogin()">Unlock</button>
+            <div class="login-error" id="loginError"></div>
+        </div>
+    </div>
+
+    <header>
+        <div class="brand">
+            <div class="logo">🍽️</div>
+            <div>
+                <h1>Katina — Dashboard</h1>
+                <div class="whoami" id="whoamiLabel"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <div class="stats-row" id="statsRow"></div>
+
+        <div class="section-title"><span><span class="bar"></span>Menu Items</span></div>
+
+        <div class="add-form">
+            <input type="text" id="itemId" placeholder="id (e.g. fries)">
+            <input type="text" id="itemName" placeholder="Name">
+            <input type="number" id="itemPrice" placeholder="Price" step="0.01">
+            <input type="text" id="itemDesc" placeholder="Description">
+            <input type="text" id="itemImage" placeholder="Image URL (optional)">
+            <button class="primary" onclick="addItem()">+ Add Item</button>
+            <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+        </div>
+
+        <div id="menuItemsList"></div>
+    </div>
+
+    <div class="modal-overlay" id="editOverlay">
+        <div class="edit-modal">
+            <h3>Edit Item</h3>
+            <label>Name</label>
+            <input type="text" id="editName">
+            <label>Price</label>
+            <input type="number" id="editPrice" step="0.01">
+            <label>Description</label>
+            <input type="text" id="editDesc">
+            <label>Image URL</label>
+            <input type="text" id="editImage">
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="primary" onclick="saveEdit()">Save</button>
+                <button class="secondary" onclick="closeEdit()">Cancel</button>
+            </div>
+            <p id="editResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+        </div>
+    </div>
+
+    <script>
+        const BASE = "https://katina-bot.onrender.com";
+        let editingItemId = null;
+
+        function getToken() { return localStorage.getItem("waiterToken"); }
+        function getWaiterName() { return localStorage.getItem("waiterName") || "Unknown"; }
+
+        function doLogin() {
+            const name = document.getElementById("nameInput").value.trim();
+            const code = document.getElementById("loginInput").value;
+            if (!name) {
+                document.getElementById("loginError").innerText = "Please enter your name.";
+                return;
+            }
+            if (!code) return;
+
+            fetch(`${BASE}/tables?table_id=__token_check__`, {
+                method: "POST",
+                headers: { "X-Waiter-Token": code }
+            }).then(r => {
+                if (r.status === 401) {
+                    document.getElementById("loginError").innerText = "Incorrect code, try again.";
+                    return null;
+                }
+                return r.json();
+            }).then(data => {
+                if (!data) return;
+                localStorage.setItem("waiterToken", code);
+                localStorage.setItem("waiterName", name);
+                document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("whoamiLabel").innerText = "Logged in as " + name;
+                init();
+            });
+        }
+
+        function authHeaders() {
+            return { "X-Waiter-Token": getToken(), "X-Waiter-Name": getWaiterName() };
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return "";
+            return String(str)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+
+        function init() {
+            loadStats();
+            loadMenuItems();
+            setInterval(loadStats, 8000);
+        }
+
+        function loadStats() {
+            Promise.all([
+                fetch(`${BASE}/tables`).then(r => r.json()),
+                fetch(`${BASE}/orders/pending`).then(r => r.json()),
+                fetch(`${BASE}/sessions`).then(r => r.json()),
+            ]).then(([tables, pending, sessions]) => {
+                const occupied = tables.filter(t => t.active_session_id).length;
+                document.getElementById("statsRow").innerHTML = `
+                    <div class="stat-card"><div class="num">${tables.length}</div><div class="label">Total Tables</div></div>
+                    <div class="stat-card"><div class="num">${occupied}</div><div class="label">Occupied</div></div>
+                    <div class="stat-card"><div class="num">${sessions.length}</div><div class="label">Open Sessions</div></div>
+                    <div class="stat-card"><div class="num">${pending.length}</div><div class="label">Pending Orders</div></div>
+                `;
+            });
+        }
+
+        function loadMenuItems() {
+            fetch(`${BASE}/menu-items`)
+                .then(r => r.json())
+                .then(items => {
+                    const list = document.getElementById("menuItemsList");
+                    if (!items.length) {
+                        list.innerHTML = `<p style="color:#999;">No menu items yet.</p>`;
+                        return;
+                    }
+                    list.innerHTML = items.map(item => `
+                        <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
+                            <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
+                            <div class="item-info">
+                                <div class="name">${escapeHtml(item.name)} ${item.available ? '' : '(unavailable)'}</div>
+                                <div class="price">€${Number(item.price).toFixed(2)}</div>
+                                <div class="desc">${escapeHtml(item.description || '')}</div>
+                            </div>
+                            <div class="item-actions">
+                                <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? 'Hide' : 'Show'}</button>
+                                <button onclick="openEdit('${item.item_id}', '${escapeHtml(item.name)}', ${item.price}, '${escapeHtml(item.description || '')}', '${escapeHtml(item.image || '')}')">Edit</button>
+                                <button class="danger" onclick="deleteItem('${item.item_id}')">Delete</button>
+                            </div>
+                        </div>
+                    `).join("");
+                });
+        }
+
+        function addItem() {
+            const id = document.getElementById("itemId").value.trim();
+            const name = document.getElementById("itemName").value.trim();
+            const price = document.getElementById("itemPrice").value;
+            const desc = document.getElementById("itemDesc").value;
+            const image = document.getElementById("itemImage").value;
+
+            if (!id || !name || !price) {
+                document.getElementById("addResult").innerText = "Id, name and price are required.";
+                return;
+            }
+
+            fetch(`${BASE}/menu-items?item_id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&price=${price}&description=${encodeURIComponent(desc)}&image=${encodeURIComponent(image)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("addResult").innerText = data.error;
+                        return;
+                    }
+                    document.getElementById("itemId").value = "";
+                    document.getElementById("itemName").value = "";
+                    document.getElementById("itemPrice").value = "";
+                    document.getElementById("itemDesc").value = "";
+                    document.getElementById("itemImage").value = "";
+                    document.getElementById("addResult").innerText = "Added!";
+                    loadMenuItems();
+                });
+        }
+
+        function toggleAvailable(itemId, newValue) {
+            fetch(`${BASE}/menu-items/${itemId}/update?available=${newValue}`, {
+                method: "POST",
+                headers: authHeaders()
+            }).then(() => loadMenuItems());
+        }
+
+        function deleteItem(itemId) {
+            if (!confirm(`Delete "${itemId}" permanently?`)) return;
+            fetch(`${BASE}/menu-items/${itemId}`, {
+                method: "DELETE",
+                headers: authHeaders()
+            }).then(() => loadMenuItems());
+        }
+
+        function openEdit(itemId, name, price, desc, image) {
+            editingItemId = itemId;
+            document.getElementById("editName").value = name;
+            document.getElementById("editPrice").value = price;
+            document.getElementById("editDesc").value = desc;
+            document.getElementById("editImage").value = image;
+            document.getElementById("editResult").innerText = "";
+            document.getElementById("editOverlay").style.display = "flex";
+        }
+
+        function closeEdit() {
+            document.getElementById("editOverlay").style.display = "none";
+            editingItemId = null;
+        }
+
+        function saveEdit() {
+            const name = document.getElementById("editName").value;
+            const price = document.getElementById("editPrice").value;
+            const desc = document.getElementById("editDesc").value;
+            const image = document.getElementById("editImage").value;
+
+            fetch(`${BASE}/menu-items/${editingItemId}/update?name=${encodeURIComponent(name)}&price=${price}&description=${encodeURIComponent(desc)}&image=${encodeURIComponent(image)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("editResult").innerText = data.error;
+                        return;
+                    }
+                    closeEdit();
+                    loadMenuItems();
+                });
+        }
+
+        if (getToken()) {
+            document.getElementById("loginScreen").style.display = "none";
+            document.getElementById("whoamiLabel").innerText = "Logged in as " + getWaiterName();
+            init();
+        }
+    </script>
+</body>
+</html>
