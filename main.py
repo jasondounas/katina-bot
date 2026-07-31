@@ -137,6 +137,18 @@ def init_db():
     except psycopg2.errors.DuplicateTable:
         conn.rollback()
 
+    seed_items = [
+        ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/images/coke.jpg"),
+        ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/images/burger.jpg"),
+        ("salad", "salad", 7.20, "Crisp greens, feta, olives, house vinaigrette", "https://katina-bot-2.onrender.com/images/salad.jpg"),
+    ]
+    for item_id, name, price, description, image in seed_items:
+        cur.execute(
+            "INSERT INTO menu_items (item_id, name, price, description, image, available) VALUES (%s, %s, %s, %s, %s, 1) ON CONFLICT (item_id) DO NOTHING",
+            (item_id, name, price, description, image),
+        )
+    conn.commit()
+
     cur.close()
     conn.close()
 
@@ -151,11 +163,21 @@ def root():
 
 @app.get("/menu")
 def get_menu():
-    try:
-        response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
-        return response.json()
-    except (httpx.RequestError, ValueError):
-        return {}
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM menu_items WHERE available = 1")
+    items = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    menu = {}
+    for item in items:
+        menu[item["item_id"]] = {
+            "price": item["price"],
+            "description": item["description"],
+            "image": item["image"],
+        }
+    return menu
 
 
 @app.get("/activity-log")
@@ -167,6 +189,88 @@ def get_activity_log(_auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
     return [dict(l) for l in logs]
+
+
+# ---------- Menu Items ----------
+
+@app.post("/menu-items")
+def add_menu_item(item_id: str, name: str, price: float, description: str = "", image: str = "", _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (item_id,))
+    if cur.fetchone():
+        cur.close()
+        conn.close()
+        return {"error": "Item already exists"}
+
+    cur.execute(
+        "INSERT INTO menu_items (item_id, name, price, description, image, available) VALUES (%s, %s, %s, %s, %s, 1)",
+        (item_id, name, price, description, image),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "added menu item", item_id)
+
+    return {"item_id": item_id, "name": name, "price": price}
+
+
+@app.get("/menu-items")
+def list_menu_items():
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM menu_items ORDER BY name")
+    items = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [dict(i) for i in items]
+
+
+@app.post("/menu-items/{item_id}/update")
+def update_menu_item(item_id: str, name: str = None, price: float = None, description: str = None, image: str = None, available: int = None, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (item_id,))
+    item = cur.fetchone()
+
+    if item is None:
+        cur.close()
+        conn.close()
+        return {"error": "Item not found"}
+
+    cur.execute(
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s WHERE item_id=%s",
+        (
+            name if name is not None else item["name"],
+            price if price is not None else item["price"],
+            description if description is not None else item["description"],
+            image if image is not None else item["image"],
+            available if available is not None else item["available"],
+            item_id,
+        ),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "updated menu item", item_id)
+
+    return {"item_id": item_id, "updated": True}
+
+
+@app.delete("/menu-items/{item_id}")
+def delete_menu_item(item_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("DELETE FROM menu_items WHERE item_id = %s", (item_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "deleted menu item", item_id)
+
+    return {"item_id": item_id, "deleted": True}
 
 
 # ---------- Tables (permanent) ----------
@@ -583,17 +687,14 @@ def get_pending_orders():
     return [dict(order) for order in orders]
 
 
-def get_price_from_pda(item: str) -> float:
-    try:
-        response = httpx.get(f"{PDA_URL}/menu", timeout=5.0)
-        menu = response.json()
-        item_data = menu.get(item)
-        if isinstance(item_data, dict):
-            return item_data.get("price", 0)
-        return item_data if item_data else 0
-    except (httpx.RequestError, ValueError, KeyError, TypeError) as e:
-        print(f"⚠ PDA unreachable or bad data while fetching menu — {e}")
-        return 0
+def get_price_from_db(item: str) -> float:
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT price FROM menu_items WHERE item_id = %s AND available = 1", (item,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row["price"] if row else 0
 
 
 @app.post("/orders")
@@ -620,7 +721,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         conn.close()
         return {"error": "Session not found"}
 
-    price = get_price_from_pda(item)
+    price = get_price_from_db(item)
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
