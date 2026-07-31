@@ -32,12 +32,34 @@
 
     <script>
        const PDA = "https://katina-bot-1.onrender.com";
+       let previousTicketCount = 0;
+
+       function playNotificationSound() {
+           try {
+               const ctx = new (window.AudioContext || window.webkitAudioContext)();
+               const oscillator = ctx.createOscillator();
+               const gain = ctx.createGain();
+               oscillator.connect(gain);
+               gain.connect(ctx.destination);
+               oscillator.frequency.value = 880;
+               gain.gain.setValueAtTime(0.3, ctx.currentTime);
+               gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+               oscillator.start();
+               oscillator.stop(ctx.currentTime + 0.3);
+           } catch (e) {
+               console.log("Could not play notification sound", e);
+           }
+       }
 
        function loadTickets() {
     fetch(`${PDA}/kitchen-tickets`)
         .then(r => r.json())
         .then(tickets => {
-            console.log("Tickets received:", tickets);   // <-- add this line
+            if (tickets.length > previousTicketCount) {
+                playNotificationSound();
+            }
+            previousTicketCount = tickets.length;
+
             const grid = document.getElementById("ticketGrid");
                     grid.innerHTML = tickets.length
                         ? tickets.map(t => `
