@@ -313,6 +313,24 @@
         const BASE = "https://katina-bot.onrender.com";
         let editingItemId = null;
         let activityLoaded = false;
+        let previousAlertCount = 0;
+
+        function playNotificationSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.frequency.value = 880;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                oscillator.start();
+                oscillator.stop(ctx.currentTime + 0.3);
+            } catch (e) {
+                console.log("Could not play notification sound", e);
+            }
+        }
 
         function getToken() { return localStorage.getItem("waiterToken"); }
         function getWaiterName() { return localStorage.getItem("waiterName") || "Unknown"; }
@@ -408,12 +426,14 @@
                 sessions.forEach(s => { sessionByTableId[s.table_id] = s; });
 
                 let alertsHtml = "";
+                let alertCount = 0;
                 tables.forEach(t => {
                     const s = sessionByTableId[t.table_id];
                     if (!s) return;
                     const label = t.display_label || t.table_id;
 
                     if (s.waiter_called) {
+                        alertCount++;
                         alertsHtml += `
                             <div class="alert-row called">
                                 <div><div class="table-name">${escapeHtml(label)}</div><div class="type">🔔 Called for a waiter</div></div>
@@ -421,6 +441,7 @@
                         `;
                     }
                     if (s.payment_requested) {
+                        alertCount++;
                         const methodLabel = paymentMethodLabel(s.payment_method);
                         alertsHtml += `
                             <div class="alert-row pay">
@@ -429,6 +450,11 @@
                         `;
                     }
                 });
+
+                if (alertCount > previousAlertCount) {
+                    playNotificationSound();
+                }
+                previousAlertCount = alertCount;
 
                 document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">No active alerts 🎉</div>`;
             });
