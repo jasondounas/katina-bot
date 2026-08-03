@@ -106,6 +106,16 @@
             margin-right: 10px;
         }
 
+        .category-heading {
+            font-size: 15px;
+            font-weight: 800;
+            color: #7c3aed;
+            margin: 20px 0 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .category-heading:first-child { margin-top: 0; }
+
         .collapsible-header {
             cursor: pointer;
             user-select: none;
@@ -218,6 +228,7 @@
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
         #itemDesc { width: 220px; }
+        #itemCategory { width: 140px; }
 
         .image-source-toggle {
             display: flex;
@@ -308,6 +319,13 @@
             <input type="text" id="itemName" placeholder="Name">
             <input type="number" id="itemPrice" placeholder="Price" step="0.01">
             <input type="text" id="itemDesc" placeholder="Description">
+            <input type="text" id="itemCategory" placeholder="Category" list="categoryOptions">
+            <datalist id="categoryOptions">
+                <option value="drinks">
+                <option value="salads">
+                <option value="burgers">
+                <option value="other">
+            </datalist>
 
             <div class="image-source-toggle">
                 <button type="button" id="addSourceUrl" class="active" onclick="setAddImageSource('url')">Image URL</button>
@@ -334,6 +352,8 @@
             <input type="number" id="editPrice" step="0.01">
             <label>Description</label>
             <input type="text" id="editDesc">
+            <label>Category</label>
+            <input type="text" id="editCategory" list="categoryOptions">
 
             <label>Image</label>
             <div class="image-source-toggle">
@@ -359,6 +379,17 @@
         let previousAlertCount = 0;
         let addImageData = "";
         let editImageData = "";
+
+        const CATEGORY_LABELS = {
+            drinks: "🥤 Drinks",
+            salads: "🥗 Salads",
+            burgers: "🍔 Burgers",
+            other: "🍽️ Other"
+        };
+
+        function categoryLabel(cat) {
+            return CATEGORY_LABELS[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
+        }
 
         function getToken() { return localStorage.getItem("waiterToken"); }
         function getWaiterName() { return localStorage.getItem("waiterName") || "Unknown"; }
@@ -414,8 +445,6 @@
             if (method === "card") return "💳 Card";
             return "";
         }
-
-        // ---------- Photo handling ----------
 
         function resizeAndConvertImage(file, callback) {
             const reader = new FileReader();
@@ -577,21 +606,35 @@
                         return;
                     }
                     window._menuItemsCache = items;
-                    list.innerHTML = items.map(item => `
-                        <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
-                            <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
-                            <div class="item-info">
-                                <div class="name">${escapeHtml(item.name)} ${item.available ? '' : '(unavailable)'}</div>
-                                <div class="price">€${Number(item.price).toFixed(2)}</div>
-                                <div class="desc">${escapeHtml(item.description || '')}</div>
+
+                    const byCategory = {};
+                    items.forEach(item => {
+                        const cat = item.category || "other";
+                        if (!byCategory[cat]) byCategory[cat] = [];
+                        byCategory[cat].push(item);
+                    });
+
+                    let html = "";
+                    Object.keys(byCategory).forEach(cat => {
+                        html += `<div class="category-heading">${categoryLabel(cat)}</div>`;
+                        html += byCategory[cat].map(item => `
+                            <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
+                                <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
+                                <div class="item-info">
+                                    <div class="name">${escapeHtml(item.name)} ${item.available ? '' : '(unavailable)'}</div>
+                                    <div class="price">€${Number(item.price).toFixed(2)}</div>
+                                    <div class="desc">${escapeHtml(item.description || '')}</div>
+                                </div>
+                                <div class="item-actions">
+                                    <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? 'Hide' : 'Show'}</button>
+                                    <button onclick="openEdit('${item.item_id}')">Edit</button>
+                                    <button class="danger" onclick="deleteItem('${item.item_id}')">Delete</button>
+                                </div>
                             </div>
-                            <div class="item-actions">
-                                <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? 'Hide' : 'Show'}</button>
-                                <button onclick="openEdit('${item.item_id}')">Edit</button>
-                                <button class="danger" onclick="deleteItem('${item.item_id}')">Delete</button>
-                            </div>
-                        </div>
-                    `).join("");
+                        `).join("");
+                    });
+
+                    list.innerHTML = html;
                 });
         }
 
@@ -600,6 +643,7 @@
             const name = document.getElementById("itemName").value.trim();
             const price = parseFloat(document.getElementById("itemPrice").value);
             const desc = document.getElementById("itemDesc").value;
+            const category = document.getElementById("itemCategory").value.trim() || "other";
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
 
@@ -611,7 +655,7 @@
             fetch(`${BASE}/menu-items`, {
                 method: "POST",
                 headers: authHeadersJson(),
-                body: JSON.stringify({ item_id: id, name, price, description: desc, image })
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category })
             })
                 .then(r => r.json())
                 .then(data => {
@@ -623,6 +667,7 @@
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
                     document.getElementById("itemDesc").value = "";
+                    document.getElementById("itemCategory").value = "";
                     document.getElementById("itemImageUrl").value = "";
                     document.getElementById("itemImageFile").value = "";
                     document.getElementById("addImagePreview").style.display = "none";
@@ -657,6 +702,7 @@
             document.getElementById("editName").value = item.name;
             document.getElementById("editPrice").value = item.price;
             document.getElementById("editDesc").value = item.description || "";
+            document.getElementById("editCategory").value = item.category || "other";
             document.getElementById("editImageUrl").value = item.image || "";
             document.getElementById("editImagePreview").style.display = "none";
             document.getElementById("editImageFile").value = "";
@@ -674,10 +720,11 @@
             const name = document.getElementById("editName").value;
             const price = parseFloat(document.getElementById("editPrice").value);
             const desc = document.getElementById("editDesc").value;
+            const category = document.getElementById("editCategory").value.trim() || "other";
             const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("editImageUrl").value : editImageData;
 
-            const payload = { name, price, description: desc };
+            const payload = { name, price, description: desc, category };
             if (image) payload.image = image;
 
             fetch(`${BASE}/menu-items/${editingItemId}/update`, {
