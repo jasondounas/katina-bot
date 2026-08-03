@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uuid
 import os
 import psycopg2
@@ -19,6 +20,22 @@ PDA_URL = "https://katina-bot-1.onrender.com"
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 WAITER_TOKEN = os.environ.get("WAITER_TOKEN", "changeme")
+
+
+class MenuItemCreate(BaseModel):
+    item_id: str
+    name: str
+    price: float
+    description: str = ""
+    image: str = ""
+
+
+class MenuItemUpdate(BaseModel):
+    name: str = None
+    price: float = None
+    description: str = None
+    image: str = None
+    available: int = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -194,10 +211,10 @@ def get_activity_log(_auth: None = Depends(verify_waiter)):
 # ---------- Menu Items ----------
 
 @app.post("/menu-items")
-def add_menu_item(item_id: str, name: str, price: float, description: str = "", image: str = "", _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
-    cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (item_id,))
+    cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (payload.item_id,))
     if cur.fetchone():
         cur.close()
         conn.close()
@@ -205,15 +222,15 @@ def add_menu_item(item_id: str, name: str, price: float, description: str = "", 
 
     cur.execute(
         "INSERT INTO menu_items (item_id, name, price, description, image, available) VALUES (%s, %s, %s, %s, %s, 1)",
-        (item_id, name, price, description, image),
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image),
     )
     conn.commit()
     cur.close()
     conn.close()
 
-    log_action(waiter_name, "added menu item", item_id)
+    log_action(waiter_name, "added menu item", payload.item_id)
 
-    return {"item_id": item_id, "name": name, "price": price}
+    return {"item_id": payload.item_id, "name": payload.name, "price": payload.price}
 
 
 @app.get("/menu-items")
@@ -228,7 +245,7 @@ def list_menu_items():
 
 
 @app.post("/menu-items/{item_id}/update")
-def update_menu_item(item_id: str, name: str = None, price: float = None, description: str = None, image: str = None, available: int = None, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (item_id,))
@@ -242,11 +259,11 @@ def update_menu_item(item_id: str, name: str = None, price: float = None, descri
     cur.execute(
         "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s WHERE item_id=%s",
         (
-            name if name is not None else item["name"],
-            price if price is not None else item["price"],
-            description if description is not None else item["description"],
-            image if image is not None else item["image"],
-            available if available is not None else item["available"],
+            payload.name if payload.name is not None else item["name"],
+            payload.price if payload.price is not None else item["price"],
+            payload.description if payload.description is not None else item["description"],
+            payload.image if payload.image is not None else item["image"],
+            payload.available if payload.available is not None else item["available"],
             item_id,
         ),
     )
