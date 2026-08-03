@@ -217,7 +217,31 @@
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
-        #itemDesc, #itemImage { width: 220px; }
+        #itemDesc { width: 220px; }
+
+        .image-source-toggle {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .image-source-toggle button {
+            background: #f0f0f0;
+            color: #555;
+            font-size: 12px;
+            padding: 8px 14px;
+        }
+        .image-source-toggle button.active {
+            background: #1a1a1a;
+            color: white;
+        }
+        .image-preview {
+            width: 80px; height: 80px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: #f0f0f0;
+            margin-top: 8px;
+            display: none;
+        }
 
         .modal-overlay {
             display: none;
@@ -229,6 +253,8 @@
         .edit-modal {
             background: white; border-radius: 20px; padding: 24px;
             width: 90%; max-width: 420px;
+            max-height: 85vh;
+            overflow-y: auto;
         }
         .edit-modal h3 { margin-bottom: 14px; }
         .edit-modal input {
@@ -282,7 +308,16 @@
             <input type="text" id="itemName" placeholder="Name">
             <input type="number" id="itemPrice" placeholder="Price" step="0.01">
             <input type="text" id="itemDesc" placeholder="Description">
-            <input type="text" id="itemImage" placeholder="Image URL (optional)">
+
+            <div class="image-source-toggle">
+                <button type="button" id="addSourceUrl" class="active" onclick="setAddImageSource('url')">Image URL</button>
+                <button type="button" id="addSourceFile" onclick="setAddImageSource('file')">Upload Photo</button>
+            </div>
+            <input type="text" id="itemImageUrl" placeholder="Image URL (optional)">
+            <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleAddImageFile(this)">
+            <img class="image-preview" id="addImagePreview">
+
+            <br>
             <button class="primary" onclick="addItem()">+ Add Item</button>
             <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
@@ -299,9 +334,17 @@
             <input type="number" id="editPrice" step="0.01">
             <label>Description</label>
             <input type="text" id="editDesc">
-            <label>Image URL</label>
-            <input type="text" id="editImage">
-            <div style="display:flex; gap:8px; margin-top:10px;">
+
+            <label>Image</label>
+            <div class="image-source-toggle">
+                <button type="button" id="editSourceUrl" class="active" onclick="setEditImageSource('url')">Image URL</button>
+                <button type="button" id="editSourceFile" onclick="setEditImageSource('file')">Upload Photo</button>
+            </div>
+            <input type="text" id="editImageUrl" placeholder="Image URL">
+            <input type="file" id="editImageFile" accept="image/*" style="display:none;" onchange="handleEditImageFile(this)">
+            <img class="image-preview" id="editImagePreview">
+
+            <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="primary" onclick="saveEdit()">Save</button>
                 <button class="secondary" onclick="closeEdit()">Cancel</button>
             </div>
@@ -314,23 +357,8 @@
         let editingItemId = null;
         let activityLoaded = false;
         let previousAlertCount = 0;
-
-        function playNotificationSound() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = ctx.createOscillator();
-                const gain = ctx.createGain();
-                oscillator.connect(gain);
-                gain.connect(ctx.destination);
-                oscillator.frequency.value = 880;
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-                oscillator.start();
-                oscillator.stop(ctx.currentTime + 0.3);
-            } catch (e) {
-                console.log("Could not play notification sound", e);
-            }
-        }
+        let addImageData = "";
+        let editImageData = "";
 
         function getToken() { return localStorage.getItem("waiterToken"); }
         function getWaiterName() { return localStorage.getItem("waiterName") || "Unknown"; }
@@ -363,6 +391,13 @@
             });
         }
 
+        function authHeadersJson() {
+            return {
+                "X-Waiter-Token": getToken(),
+                "X-Waiter-Name": getWaiterName(),
+                "Content-Type": "application/json"
+            };
+        }
         function authHeaders() {
             return { "X-Waiter-Token": getToken(), "X-Waiter-Name": getWaiterName() };
         }
@@ -378,6 +413,61 @@
             if (method === "cash") return "💵 Cash";
             if (method === "card") return "💳 Card";
             return "";
+        }
+
+        // ---------- Photo handling ----------
+
+        function resizeAndConvertImage(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const maxWidth = 500;
+                    const scale = Math.min(1, maxWidth / img.width);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    callback(canvas.toDataURL("image/jpeg", 0.7));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setAddImageSource(source) {
+            document.getElementById("addSourceUrl").classList.toggle("active", source === "url");
+            document.getElementById("addSourceFile").classList.toggle("active", source === "file");
+            document.getElementById("itemImageUrl").style.display = source === "url" ? "block" : "none";
+            document.getElementById("itemImageFile").style.display = source === "file" ? "block" : "none";
+        }
+
+        function handleAddImageFile(input) {
+            if (!input.files || !input.files[0]) return;
+            resizeAndConvertImage(input.files[0], (dataUrl) => {
+                addImageData = dataUrl;
+                const preview = document.getElementById("addImagePreview");
+                preview.src = dataUrl;
+                preview.style.display = "block";
+            });
+        }
+
+        function setEditImageSource(source) {
+            document.getElementById("editSourceUrl").classList.toggle("active", source === "url");
+            document.getElementById("editSourceFile").classList.toggle("active", source === "file");
+            document.getElementById("editImageUrl").style.display = source === "url" ? "block" : "none";
+            document.getElementById("editImageFile").style.display = source === "file" ? "block" : "none";
+        }
+
+        function handleEditImageFile(input) {
+            if (!input.files || !input.files[0]) return;
+            resizeAndConvertImage(input.files[0], (dataUrl) => {
+                editImageData = dataUrl;
+                const preview = document.getElementById("editImagePreview");
+                preview.src = dataUrl;
+                preview.style.display = "block";
+            });
         }
 
         function init() {
@@ -451,11 +541,6 @@
                     }
                 });
 
-                if (alertCount > previousAlertCount) {
-                    playNotificationSound();
-                }
-                previousAlertCount = alertCount;
-
                 document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">No active alerts 🎉</div>`;
             });
         }
@@ -491,6 +576,7 @@
                         list.innerHTML = `<p style="color:#999;">No menu items yet.</p>`;
                         return;
                     }
+                    window._menuItemsCache = items;
                     list.innerHTML = items.map(item => `
                         <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
                             <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
@@ -501,7 +587,7 @@
                             </div>
                             <div class="item-actions">
                                 <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? 'Hide' : 'Show'}</button>
-                                <button onclick="openEdit('${item.item_id}', '${escapeHtml(item.name)}', ${item.price}, '${escapeHtml(item.description || '')}', '${escapeHtml(item.image || '')}')">Edit</button>
+                                <button onclick="openEdit('${item.item_id}')">Edit</button>
                                 <button class="danger" onclick="deleteItem('${item.item_id}')">Delete</button>
                             </div>
                         </div>
@@ -512,18 +598,20 @@
         function addItem() {
             const id = document.getElementById("itemId").value.trim();
             const name = document.getElementById("itemName").value.trim();
-            const price = document.getElementById("itemPrice").value;
+            const price = parseFloat(document.getElementById("itemPrice").value);
             const desc = document.getElementById("itemDesc").value;
-            const image = document.getElementById("itemImage").value;
+            const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
+            const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
 
             if (!id || !name || !price) {
                 document.getElementById("addResult").innerText = "Id, name and price are required.";
                 return;
             }
 
-            fetch(`${BASE}/menu-items?item_id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&price=${price}&description=${encodeURIComponent(desc)}&image=${encodeURIComponent(image)}`, {
+            fetch(`${BASE}/menu-items`, {
                 method: "POST",
-                headers: authHeaders()
+                headers: authHeadersJson(),
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image })
             })
                 .then(r => r.json())
                 .then(data => {
@@ -535,16 +623,20 @@
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
                     document.getElementById("itemDesc").value = "";
-                    document.getElementById("itemImage").value = "";
+                    document.getElementById("itemImageUrl").value = "";
+                    document.getElementById("itemImageFile").value = "";
+                    document.getElementById("addImagePreview").style.display = "none";
+                    addImageData = "";
                     document.getElementById("addResult").innerText = "Added!";
                     loadMenuItems();
                 });
         }
 
         function toggleAvailable(itemId, newValue) {
-            fetch(`${BASE}/menu-items/${itemId}/update?available=${newValue}`, {
+            fetch(`${BASE}/menu-items/${itemId}/update`, {
                 method: "POST",
-                headers: authHeaders()
+                headers: authHeadersJson(),
+                body: JSON.stringify({ available: newValue })
             }).then(() => loadMenuItems());
         }
 
@@ -556,12 +648,19 @@
             }).then(() => loadMenuItems());
         }
 
-        function openEdit(itemId, name, price, desc, image) {
+        function openEdit(itemId) {
+            const item = (window._menuItemsCache || []).find(i => i.item_id === itemId);
+            if (!item) return;
+
             editingItemId = itemId;
-            document.getElementById("editName").value = name;
-            document.getElementById("editPrice").value = price;
-            document.getElementById("editDesc").value = desc;
-            document.getElementById("editImage").value = image;
+            editImageData = "";
+            document.getElementById("editName").value = item.name;
+            document.getElementById("editPrice").value = item.price;
+            document.getElementById("editDesc").value = item.description || "";
+            document.getElementById("editImageUrl").value = item.image || "";
+            document.getElementById("editImagePreview").style.display = "none";
+            document.getElementById("editImageFile").value = "";
+            setEditImageSource("url");
             document.getElementById("editResult").innerText = "";
             document.getElementById("editOverlay").style.display = "flex";
         }
@@ -573,13 +672,18 @@
 
         function saveEdit() {
             const name = document.getElementById("editName").value;
-            const price = document.getElementById("editPrice").value;
+            const price = parseFloat(document.getElementById("editPrice").value);
             const desc = document.getElementById("editDesc").value;
-            const image = document.getElementById("editImage").value;
+            const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
+            const image = urlVisible ? document.getElementById("editImageUrl").value : editImageData;
 
-            fetch(`${BASE}/menu-items/${editingItemId}/update?name=${encodeURIComponent(name)}&price=${price}&description=${encodeURIComponent(desc)}&image=${encodeURIComponent(image)}`, {
+            const payload = { name, price, description: desc };
+            if (image) payload.image = image;
+
+            fetch(`${BASE}/menu-items/${editingItemId}/update`, {
                 method: "POST",
-                headers: authHeaders()
+                headers: authHeadersJson(),
+                body: JSON.stringify(payload)
             })
                 .then(r => r.json())
                 .then(data => {
