@@ -763,7 +763,11 @@
 
                                     content.innerHTML = `
                                         <h2>${safeLabel}</h2>
-                                        <p style="color:#777; margin:6px 0 12px;">👥 ${session.party_size} people &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</p>
+                                        <p style="color:#777; margin:6px 0 12px;">
+                                            👥 ${session.party_size} people
+                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">✏️ Edit</span>
+                                            &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}
+                                        </p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">Customer link ↗</a></p>
                                         ${alerts}
                                         <h3 style="font-size:16px; margin:20px 0 10px;">Orders</h3>
@@ -780,6 +784,25 @@
                                     if (!silent) document.getElementById("overlay").style.display = "flex";
                                 });
                         });
+                });
+        }
+
+        function editPartySize(sessionId, currentSize) {
+            const newSize = prompt("Update party size:", currentSize);
+            if (newSize === null) return;
+
+            fetch(`${BASE}/sessions/${sessionId}/update-party-size?party_size=${newSize}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
                 });
         }
 
