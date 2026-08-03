@@ -28,6 +28,7 @@ class MenuItemCreate(BaseModel):
     price: float
     description: str = ""
     image: str = ""
+    category: str = "other"
 
 
 class MenuItemUpdate(BaseModel):
@@ -36,6 +37,7 @@ class MenuItemUpdate(BaseModel):
     description: str = None
     image: str = None
     available: int = None
+    category: str = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -146,6 +148,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("""
             CREATE UNIQUE INDEX idx_orders_idempotency
             ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL
@@ -155,14 +163,14 @@ def init_db():
         conn.rollback()
 
     seed_items = [
-        ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/image/coke.jpg"),
-        ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/image/burger.jpg"),
-        ("salad", "salad", 7.20, "Crisp greens, feta, olives, house vinaigrette", "https://katina-bot-2.onrender.com/image/salad.jpg"),
+        ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/image/coke.jpg", "drinks"),
+        ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/image/burger.jpg", "burgers"),
+        ("salad", "salad", 7.20, "Crisp greens, feta, olives, house vinaigrette", "https://katina-bot-2.onrender.com/image/salad.jpg", "salads"),
     ]
-    for item_id, name, price, description, image in seed_items:
+    for item_id, name, price, description, image, category in seed_items:
         cur.execute(
-            "INSERT INTO menu_items (item_id, name, price, description, image, available) VALUES (%s, %s, %s, %s, %s, 1) ON CONFLICT (item_id) DO NOTHING",
-            (item_id, name, price, description, image),
+            "INSERT INTO menu_items (item_id, name, price, description, image, available, category) VALUES (%s, %s, %s, %s, %s, 1, %s) ON CONFLICT (item_id) DO NOTHING",
+            (item_id, name, price, description, image, category),
         )
     conn.commit()
 
@@ -193,6 +201,7 @@ def get_menu():
             "price": item["price"],
             "description": item["description"],
             "image": item["image"],
+            "category": item["category"] or "other",
         }
     return menu
 
@@ -221,8 +230,8 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
         return {"error": "Item already exists"}
 
     cur.execute(
-        "INSERT INTO menu_items (item_id, name, price, description, image, available) VALUES (%s, %s, %s, %s, %s, 1)",
-        (payload.item_id, payload.name, payload.price, payload.description, payload.image),
+        "INSERT INTO menu_items (item_id, name, price, description, image, available, category) VALUES (%s, %s, %s, %s, %s, 1, %s)",
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category),
     )
     conn.commit()
     cur.close()
@@ -237,7 +246,7 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
 def list_menu_items():
     conn = get_connection()
     cur = get_cursor(conn)
-    cur.execute("SELECT * FROM menu_items ORDER BY name")
+    cur.execute("SELECT * FROM menu_items ORDER BY category, name")
     items = cur.fetchall()
     cur.close()
     conn.close()
@@ -257,13 +266,14 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
         return {"error": "Item not found"}
 
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
             payload.description if payload.description is not None else item["description"],
             payload.image if payload.image is not None else item["image"],
             payload.available if payload.available is not None else item["available"],
+            payload.category if payload.category is not None else item["category"],
             item_id,
         ),
     )
