@@ -17,11 +17,10 @@
             padding: 28px 24px 20px;
             color: white;
         }
-        header .top-row {
-            display: flex; justify-content: space-between; align-items: flex-start;
+        header .brand {
+            display: flex; align-items: center; gap: 14px;
             max-width: 900px; margin: 0 auto;
         }
-        header .brand { display: flex; align-items: center; gap: 14px; }
         header .logo {
             width: 52px; height: 52px;
             background: linear-gradient(135deg, #ff6b35, #f7931e);
@@ -32,16 +31,6 @@
         }
         header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
         header .sub { font-size: 14px; color: #ffb088; margin-top: 3px; font-weight: 600; }
-        .lang-toggle {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            color: white;
-            padding: 8px 14px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-        }
 
         .hero {
             background: linear-gradient(135deg, #2a9d8f, #1d7d72);
@@ -82,6 +71,19 @@
             background: #ff6b35;
         }
         .section-title.orders .bar { background: #2a9d8f; }
+
+        .bill-total {
+            background: white;
+            border-radius: 18px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+        }
+        .bill-total .label { font-size: 14px; color: #777; font-weight: 600; }
+        .bill-total .amount { font-size: 22px; font-weight: 800; color: #ff6b35; }
 
         .menu-grid { display: block; }
 
@@ -308,33 +310,30 @@
 <body>
 
     <header>
-        <div class="top-row">
-            <div class="brand">
-                <div class="logo">🍽️</div>
-                <div>
-                    <h1>Katina</h1>
-                    <div class="sub" id="tableLabel">...</div>
-                </div>
+        <div class="brand">
+            <div class="logo">🍽️</div>
+            <div>
+                <h1>Katina</h1>
+                <div class="sub" id="tableLabel">Loading table...</div>
             </div>
-            <button class="lang-toggle" onclick="toggleLang()" id="langToggle">🇬🇧 EN</button>
         </div>
     </header>
 
     <div class="hero">
         <div class="hero-inner">
-            <div class="tagline" id="heroTagline"></div>
-            <div class="tagline-sub" id="heroSub"></div>
+            <div class="tagline">What are you craving today?</div>
+            <div class="tagline-sub">Fresh picks, made to order, straight to your table</div>
         </div>
     </div>
 
     <div class="container" id="app">
-        <p style="text-align:center; color:#999; margin-top:40px;" id="loadingText">Loading...</p>
+        <p style="text-align:center; color:#999; margin-top:40px;">Loading...</p>
     </div>
 
     <div class="cart-bar empty" id="cartBar" onclick="openCartSheet()">
         <div class="left">
             <div class="count" id="cartCount">0</div>
-            <span id="cartSummary"></span>
+            <span id="cartSummary">View cart</span>
         </div>
         <span class="arrow">→</span>
     </div>
@@ -344,9 +343,9 @@
             <div class="sheet-content">
                 <span class="close-sheet" onclick="closeCartSheet()">✕</span>
                 <div class="sheet-handle"></div>
-                <h2 id="cartTitle"></h2>
+                <h2>Your Cart</h2>
                 <div id="cartLines"></div>
-                <button class="submit-btn" id="submitBtnMain" onclick="submitCart()"></button>
+                <button class="submit-btn" onclick="submitCart()">Send Order to Waiter</button>
             </div>
         </div>
     </div>
@@ -359,95 +358,6 @@
         let sessionId = null;
         let menu = {};
         let cart = {};
-
-        const T = {
-            en: {
-                loading: "Loading...",
-                noTable: "No table found in the link.<br>Please scan the QR code on your table.",
-                noTableLinked: "No table linked",
-                table: "Table",
-                welcomeStaff: "👋 Welcome! A member of staff will be with you shortly to get you started.",
-                menuLoadError: "Couldn't load the menu right now. Please try refreshing.",
-                menuEmpty: "The menu is empty right now.",
-                menuTitle: "Menu",
-                callWaiter: "🔔 Call Waiter",
-                waiterNotified: "🔔 Waiter notified",
-                requestBill: "💳 Request the Bill",
-                billRequested: "Bill requested",
-                cash: "Cash",
-                card: "Card",
-                yourOrders: "Your Orders",
-                noOrdersYet: "No orders yet.",
-                viewCart: "View cart",
-                yourCart: "Your Cart",
-                cartEmpty: "Your cart is empty.",
-                sendOrder: "Send Order to Waiter",
-                sending: "Sending...",
-                somethingWrong: "Something went wrong — please try again.",
-                heroTitle: "What are you craving today?",
-                heroSub: "Fresh picks, made to order, straight to your table",
-                pillStatus: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" }
-            },
-            gr: {
-                loading: "Φόρτωση...",
-                noTable: "Δεν βρέθηκε τραπέζι στον σύνδεσμο.<br>Παρακαλώ σκανάρετε το QR στο τραπέζι σας.",
-                noTableLinked: "Δεν έχει συνδεθεί τραπέζι",
-                table: "Τραπέζι",
-                welcomeStaff: "👋 Καλωσήρθατε! Ένας υπάλληλος θα έρθει σύντομα να σας εξυπηρετήσει.",
-                menuLoadError: "Δεν ήταν δυνατή η φόρτωση του μενού. Δοκιμάστε ξανά.",
-                menuEmpty: "Το μενού είναι άδειο αυτή τη στιγμή.",
-                menuTitle: "Μενού",
-                callWaiter: "🔔 Κάλεσε Σερβιτόρο",
-                waiterNotified: "🔔 Ο σερβιτόρος ειδοποιήθηκε",
-                requestBill: "💳 Ζήτα τον Λογαριασμό",
-                billRequested: "Ζητήθηκε ο λογαριασμός",
-                cash: "Μετρητά",
-                card: "Κάρτα",
-                yourOrders: "Οι Παραγγελίες σας",
-                noOrdersYet: "Δεν υπάρχουν παραγγελίες ακόμα.",
-                viewCart: "Δες το καλάθι",
-                yourCart: "Το Καλάθι σας",
-                cartEmpty: "Το καλάθι σας είναι άδειο.",
-                sendOrder: "Στείλε Παραγγελία",
-                sending: "Αποστολή...",
-                somethingWrong: "Κάτι πήγε στραβά — δοκιμάστε ξανά.",
-                heroTitle: "Τι λαχταράτε σήμερα;",
-                heroSub: "Φρέσκες επιλογές, φτιαγμένες κατόπιν παραγγελίας",
-                pillStatus: { PENDING_REVIEW: "ΣΕ ΑΝΑΜΟΝΗ", APPROVED: "ΕΓΚΡΙΘΗΚΕ", REJECTED: "ΑΠΟΡΡΙΦΘΗΚΕ", CANCELLED: "ΑΚΥΡΩΘΗΚΕ" }
-            }
-        };
-
-        function getLang() {
-            return localStorage.getItem("katinaLang") || "gr";
-        }
-
-        function toggleLang() {
-            const btn = document.getElementById("langToggle");
-            btn.disabled = true;
-
-            const newLang = getLang() === "gr" ? "en" : "gr";
-            localStorage.setItem("katinaLang", newLang);
-            applyStaticText();
-            if (menu && Object.keys(menu).length) renderMenu();
-            if (sessionId) loadMyOrders();
-
-            setTimeout(() => { btn.disabled = false; }, 300);
-        }
-
-        function t(key) {
-            return T[getLang()][key];
-        }
-
-        function applyStaticText() {
-            const lang = getLang();
-            document.getElementById("langToggle").innerText = lang === "gr" ? "🇬🇧 EN" : "🇬🇷 GR";
-            document.getElementById("heroTagline").innerText = t("heroTitle");
-            document.getElementById("heroSub").innerText = t("heroSub");
-            document.getElementById("cartTitle").innerText = t("yourCart");
-            document.getElementById("submitBtnMain").innerText = t("sendOrder");
-            document.getElementById("cartSummary").innerText = t("viewCart");
-            document.getElementById("loadingText").innerText = t("loading");
-        }
 
         function getPrice(item) {
             const data = menu[item];
@@ -478,13 +388,15 @@
         }
 
         function init() {
-            applyStaticText();
             if (!tableId) {
-                document.getElementById("app").innerHTML = `<div class="missing-session">${t("noTable")}</div>`;
-                document.getElementById("tableLabel").innerText = t("noTableLinked");
+                document.getElementById("app").innerHTML = `
+                    <div class="missing-session">
+                        No table found in the link.<br>Please scan the QR code on your table.
+                    </div>`;
+                document.getElementById("tableLabel").innerText = "No table linked";
                 return;
             }
-            document.getElementById("tableLabel").innerText = t("table") + " " + tableId;
+            document.getElementById("tableLabel").innerText = "Table " + tableId;
             checkForSession();
         }
 
@@ -493,7 +405,11 @@
                 .then(r => r.json())
                 .then(data => {
                     if (!data.active) {
-                        document.getElementById("app").innerHTML = `<div class="missing-session">${t("welcomeStaff")}</div>`;
+                        document.getElementById("app").innerHTML = `
+                            <div class="missing-session">
+                                👋 Welcome! A member of staff will be with you shortly
+                                to get you started.
+                            </div>`;
                         setTimeout(checkForSession, 4000);
                         return;
                     }
@@ -513,7 +429,10 @@
                     renderMenu();
                 })
                 .catch(() => {
-                    document.getElementById("app").innerHTML = `<div class="missing-session">${t("menuLoadError")}</div>`;
+                    document.getElementById("app").innerHTML = `
+                        <div class="missing-session">
+                            Couldn't load the menu right now. Please try refreshing.
+                        </div>`;
                 });
         }
 
@@ -522,7 +441,7 @@
             const items = Object.keys(menu);
 
             if (items.length === 0) {
-                app.innerHTML = `<div class="missing-session">${t("menuEmpty")}</div>`;
+                app.innerHTML = `<div class="missing-session">The menu is empty right now.</div>`;
                 return;
             }
 
@@ -558,14 +477,18 @@
             });
 
             app.innerHTML = `
-                <div class="section-title"><span class="bar"></span>${t("menuTitle")}</div>
+                <div class="section-title"><span class="bar"></span>Menu</div>
                 <div class="menu-grid">${itemsHtml}</div>
-                <div class="action-buttons" id="actionButtons">
-                    <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("callWaiter")}</button>
-                    <button class="pay-btn" id="payBtn" onclick="showPaymentOptions()">${t("requestBill")}</button>
+                <div class="action-buttons">
+                    <button class="call-btn" id="callBtn" onclick="callWaiter()">🔔 Call Waiter</button>
+                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">💳 Request the Bill</button>
                 </div>
-                <div class="section-title orders"><span class="bar"></span>${t("yourOrders")}</div>
-                <div id="ordersList"><p class="empty-orders">${t("noOrdersYet")}</p></div>
+                <div class="section-title orders"><span class="bar"></span>Your Orders</div>
+                <div class="bill-total" id="billTotalBox" style="display:none;">
+                    <span class="label">Bill so far</span>
+                    <span class="amount" id="billTotalAmount">€0.00</span>
+                </div>
+                <div id="ordersList"><p class="empty-orders">No orders yet.</p></div>
             `;
             updateItemBadges();
         }
@@ -577,27 +500,15 @@
         function callWaiter() {
             const btn = document.getElementById("callBtn");
             btn.disabled = true;
-            btn.innerText = t("waiterNotified");
+            btn.innerText = "🔔 Waiter notified";
             fetch(`${BASE}/sessions/${sessionId}/call-waiter`, { method: "POST" });
         }
 
-        function showPaymentOptions() {
-            const payBtn = document.getElementById("payBtn");
-            payBtn.outerHTML = `
-                <div style="display:flex; gap:8px; flex:1;">
-                    <button class="pay-btn" style="flex:1;" onclick="requestPayment('cash')">💵 ${t("cash")}</button>
-                    <button class="pay-btn" style="flex:1;" onclick="requestPayment('card')">💳 ${t("card")}</button>
-                </div>
-            `;
-        }
-
-        function requestPayment(method) {
-            fetch(`${BASE}/sessions/${sessionId}/request-payment?method=${method}`, { method: "POST" });
-            const icon = method === "cash" ? "💵" : "💳";
-            document.getElementById("actionButtons").innerHTML = `
-                <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("callWaiter")}</button>
-                <button class="pay-btn" disabled>${icon} ${t("billRequested")}</button>
-            `;
+        function requestPayment() {
+            const btn = document.getElementById("payBtn");
+            btn.disabled = true;
+            btn.innerText = "💳 Bill requested";
+            fetch(`${BASE}/sessions/${sessionId}/request-payment`, { method: "POST" });
         }
 
         function addToCart(item) {
@@ -651,7 +562,7 @@
             } else {
                 bar.classList.remove("empty");
                 document.getElementById("cartCount").innerText = totalItems;
-                document.getElementById("cartSummary").innerText = t("viewCart");
+                document.getElementById("cartSummary").innerText = "View cart";
             }
         }
 
@@ -677,16 +588,16 @@
                         </span>
                     </div>
                 `).join("")
-                : `<p style='color:#999; padding:24px 0;'>${t("cartEmpty")}</p>`;
+                : "<p style='color:#999; padding:24px 0;'>Your cart is empty.</p>";
         }
 
         function submitCart() {
             const items = Object.keys(cart);
-            if (items.length === 0) return alert(t("cartEmpty"));
+            if (items.length === 0) return alert("Add something to your cart first.");
 
-            const submitBtn = document.getElementById("submitBtnMain");
+            const submitBtn = document.querySelector(".submit-btn");
             submitBtn.disabled = true;
-            submitBtn.innerText = t("sending");
+            submitBtn.innerText = "Sending...";
 
             const requests = items.map(item => {
                 const key = generateIdempotencyKey();
@@ -701,11 +612,11 @@
                 closeCartSheet();
                 loadMyOrders();
                 submitBtn.disabled = false;
-                submitBtn.innerText = t("sendOrder");
+                submitBtn.innerText = "Send Order to Waiter";
             }).catch(() => {
                 submitBtn.disabled = false;
-                submitBtn.innerText = t("sendOrder");
-                alert(t("somethingWrong"));
+                submitBtn.innerText = "Send Order to Waiter";
+                alert("Something went wrong — please try again.");
             });
         }
 
@@ -716,15 +627,29 @@
                 .then(orders => {
                     const div = document.getElementById("ordersList");
                     if (!div) return;
-                    const statusMap = t("pillStatus");
+
+                    const billTotal = orders
+                        .filter(o => o.status === "APPROVED")
+                        .reduce((sum, o) => sum + (o.price * o.qty), 0);
+
+                    const billBox = document.getElementById("billTotalBox");
+                    if (billBox) {
+                        if (billTotal > 0) {
+                            billBox.style.display = "flex";
+                            document.getElementById("billTotalAmount").innerText = `€${billTotal.toFixed(2)}`;
+                        } else {
+                            billBox.style.display = "none";
+                        }
+                    }
+
                     div.innerHTML = orders.length
                         ? orders.map(o => `
                             <div class="order-status">
                                 <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
-                                <span class="pill ${o.status}">${statusMap[o.status] || o.status}</span>
+                                <span class="pill ${o.status}">${o.status.replace("_", " ")}</span>
                             </div>
                         `).join("")
-                        : `<p class='empty-orders'>${t("noOrdersYet")}</p>`;
+                        : "<p class='empty-orders'>No orders yet.</p>";
                 });
         }
 
