@@ -138,9 +138,9 @@ def init_db():
         conn.rollback()
 
     seed_items = [
-        ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/images/coke.jpg"),
-        ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/images/burger.jpg"),
-        ("salad", "salad", 7.20, "Crisp greens, feta, olives, house vinaigrette", "https://katina-bot-2.onrender.com/images/salad.jpg"),
+        ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/image/coke.jpg"),
+        ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/image/burger.jpg"),
+        ("salad", "salad", 7.20, "Crisp greens, feta, olives, house vinaigrette", "https://katina-bot-2.onrender.com/image/salad.jpg"),
     ]
     for item_id, name, price, description, image in seed_items:
         cur.execute(
@@ -310,6 +310,32 @@ def list_tables():
     cur.close()
     conn.close()
     return [dict(t) for t in tables]
+
+
+@app.get("/tables/{table_id}/history")
+def get_table_history(table_id: str, _auth: None = Depends(verify_waiter)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+
+    cur.execute("SELECT session_id FROM sessions WHERE table_id = %s", (table_id,))
+    session_ids = [row["session_id"] for row in cur.fetchall()]
+
+    order_ids = []
+    if session_ids:
+        cur.execute("SELECT order_id FROM orders WHERE session_id = ANY(%s)", (session_ids,))
+        order_ids = [row["order_id"] for row in cur.fetchall()]
+
+    target_ids = [table_id] + session_ids + order_ids
+
+    cur.execute(
+        "SELECT * FROM action_log WHERE target_id = ANY(%s) ORDER BY created_at DESC LIMIT 50",
+        (target_ids,),
+    )
+    logs = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [dict(l) for l in logs]
 
 
 @app.delete("/tables/{table_id}")

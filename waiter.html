@@ -209,8 +209,18 @@
             box-shadow: 0 3px 14px rgba(0,0,0,0.05);
             cursor: pointer;
             transition: transform 0.15s;
+            position: relative;
         }
         .card:hover { transform: translateY(-3px); }
+        .history-icon {
+            position: absolute;
+            top: 10px; right: 10px;
+            font-size: 16px;
+            opacity: 0.5;
+            z-index: 2;
+            cursor: pointer;
+        }
+        .history-icon:hover { opacity: 1; }
 
         .card-alert {
             padding: 10px 16px;
@@ -345,7 +355,7 @@
 
     <div class="notif-drawer" id="logDrawer">
         <div class="drawer-header">
-            <h2>📋 Activity Log</h2>
+            <h2 id="logDrawerTitle">📋 Activity Log</h2>
             <span class="drawer-close" onclick="closeAllDrawers()">✕</span>
         </div>
         <div id="logList"></div>
@@ -448,28 +458,41 @@
         }
 
         function openActivityLog() {
+            document.getElementById("logDrawerTitle").innerText = "📋 Activity Log";
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
 
             fetch(`${BASE}/activity-log`, { headers: authHeaders() })
                 .then(r => r.json())
-                .then(logs => {
-                    const list = document.getElementById("logList");
-                    if (!Array.isArray(logs) || logs.length === 0) {
-                        list.innerHTML = `<div class="notif-empty">No activity yet.</div>`;
-                        return;
-                    }
-                    list.innerHTML = logs.map(l => {
-                        const time = new Date(l.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        return `
-                            <div class="log-row">
-                                <div class="waiter">${escapeHtml(l.waiter_name)}</div>
-                                <div class="action">${escapeHtml(l.action)} — ${escapeHtml(l.target_id)}</div>
-                                <div class="time">${time}</div>
-                            </div>
-                        `;
-                    }).join("");
-                });
+                .then(logs => renderLogList(logs));
+        }
+
+        function openTableHistory(tableId, label) {
+            document.getElementById("logDrawerTitle").innerText = `🕘 ${label} — History`;
+            document.getElementById("drawerOverlay").classList.add("open");
+            document.getElementById("logDrawer").classList.add("open");
+
+            fetch(`${BASE}/tables/${tableId}/history`, { headers: authHeaders() })
+                .then(r => r.json())
+                .then(logs => renderLogList(logs, "No history for this table yet."));
+        }
+
+        function renderLogList(logs, emptyMessage) {
+            const list = document.getElementById("logList");
+            if (!Array.isArray(logs) || logs.length === 0) {
+                list.innerHTML = `<div class="notif-empty">${emptyMessage || "No activity yet."}</div>`;
+                return;
+            }
+            list.innerHTML = logs.map(l => {
+                const time = new Date(l.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `
+                    <div class="log-row">
+                        <div class="waiter">${escapeHtml(l.waiter_name)}</div>
+                        <div class="action">${escapeHtml(l.action)} — ${escapeHtml(l.target_id)}</div>
+                        <div class="time">${time}</div>
+                    </div>
+                `;
+            }).join("");
         }
 
         function closeAllDrawers() {
@@ -589,10 +612,12 @@
                         const label = t.display_label || t.table_id;
                         const safeLabel = escapeHtml(label);
                         const session = sessionByTableId[t.table_id];
+                        const historyIcon = `<span class="history-icon" onclick="event.stopPropagation(); openTableHistory('${t.table_id}', '${safeLabel}')">🕘</span>`;
 
                         if (!session) {
                             grid.innerHTML += `
                                 <div class="card empty" onclick="openTableModal('${t.table_id}')">
+                                    ${historyIcon}
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
                                         <div class="card-stats"><span class="stat empty-stat">🟢 Empty</span></div>
@@ -606,6 +631,7 @@
                             currentAlerts.push({ tableId: t.table_id, label, text: "Needs release" });
                             grid.innerHTML += `
                                 <div class="card has-alert" onclick="openTableModal('${t.table_id}')">
+                                    ${historyIcon}
                                     <div class="card-alert release">⏹️ NEEDS RELEASE</div>
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
@@ -640,6 +666,7 @@
 
                         grid.innerHTML += `
                             <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${t.table_id}')">
+                                ${historyIcon}
                                 ${bannerHtml}
                                 <div class="card-body">
                                     <h3>${safeLabel}</h3>
