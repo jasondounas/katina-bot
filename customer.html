@@ -65,12 +65,14 @@
             margin: 32px 0 18px;
             letter-spacing: -0.5px;
         }
-        .container > .section-title:first-child { margin-top: 4px; }
+        .container > .section-title:first-child,
+        .category-section:first-child .section-title { margin-top: 4px; }
         .section-title .bar {
             width: 5px; height: 24px; border-radius: 3px;
             background: #ff6b35;
         }
         .section-title.orders .bar { background: #2a9d8f; }
+        .section-title.category .bar { background: #7c3aed; }
 
         .bill-total {
             background: white;
@@ -85,7 +87,7 @@
         .bill-total .label { font-size: 14px; color: #777; font-weight: 600; }
         .bill-total .amount { font-size: 22px; font-weight: 800; color: #ff6b35; }
 
-        .menu-grid { display: block; }
+        .menu-grid { display: block; margin-bottom: 8px; }
 
         .menu-item {
             background: white;
@@ -359,6 +361,17 @@
         let menu = {};
         let cart = {};
 
+        const CATEGORY_LABELS = {
+            drinks: "🥤 Drinks",
+            salads: "🥗 Salads",
+            burgers: "🍔 Burgers",
+            other: "🍽️ More"
+        };
+
+        function categoryLabel(cat) {
+            return CATEGORY_LABELS[cat] || capitalize(cat);
+        }
+
         function getPrice(item) {
             const data = menu[item];
             return typeof data === "object" ? data.price : data;
@@ -370,6 +383,10 @@
         function getDescription(item) {
             const data = menu[item];
             return typeof data === "object" ? data.description : null;
+        }
+        function getCategory(item) {
+            const data = menu[item];
+            return (typeof data === "object" && data.category) ? data.category : "other";
         }
 
         function generateIdempotencyKey() {
@@ -436,6 +453,36 @@
                 });
         }
 
+        function buildItemHtml(item) {
+            const price = getPrice(item);
+            const image = getImage(item);
+            const description = getDescription(item);
+            const imageHtml = image
+                ? `<img src="${escapeHtml(image)}" class="item-photo" onerror="this.outerHTML='<div class=\\'item-photo-fallback\\'>🍽️</div>'">`
+                : `<div class="item-photo-fallback">🍽️</div>`;
+            const descriptionHtml = description
+                ? `<div class="description">${escapeHtml(description)}</div>`
+                : "";
+            return `
+                <div class="menu-item">
+                    <div class="photo-wrap">
+                        ${imageHtml}
+                        <span class="item-qty-badge" id="badge-${item}"></span>
+                    </div>
+                    <div class="item-info">
+                        <div class="name">${escapeHtml(capitalize(item))}</div>
+                        ${descriptionHtml}
+                        <div class="price">€${Number(price).toFixed(2)}</div>
+                    </div>
+                    <div class="qty-row" id="qtyrow-${item}">
+                        <button class="minus-btn" id="minus-${item}" onclick="changeQty('${item}', -1)">−</button>
+                        <span class="qty-display" id="qtydisplay-${item}"></span>
+                        <button class="add-btn" onclick="addToCart('${item}')">+</button>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderMenu() {
             const app = document.getElementById("app");
             const items = Object.keys(menu);
@@ -445,40 +492,30 @@
                 return;
             }
 
-            let itemsHtml = "";
+            const byCategory = {};
             items.forEach(item => {
-                const price = getPrice(item);
-                const image = getImage(item);
-                const description = getDescription(item);
-                const imageHtml = image
-                    ? `<img src="${escapeHtml(image)}" class="item-photo" onerror="this.outerHTML='<div class=\\'item-photo-fallback\\'>🍽️</div>'">`
-                    : `<div class="item-photo-fallback">🍽️</div>`;
-                const descriptionHtml = description
-                    ? `<div class="description">${escapeHtml(description)}</div>`
-                    : "";
-                itemsHtml += `
-                    <div class="menu-item">
-                        <div class="photo-wrap">
-                            ${imageHtml}
-                            <span class="item-qty-badge" id="badge-${item}"></span>
-                        </div>
-                        <div class="item-info">
-                            <div class="name">${escapeHtml(capitalize(item))}</div>
-                            ${descriptionHtml}
-                            <div class="price">€${Number(price).toFixed(2)}</div>
-                        </div>
-                        <div class="qty-row" id="qtyrow-${item}">
-                            <button class="minus-btn" id="minus-${item}" onclick="changeQty('${item}', -1)">−</button>
-                            <span class="qty-display" id="qtydisplay-${item}"></span>
-                            <button class="add-btn" onclick="addToCart('${item}')">+</button>
-                        </div>
-                    </div>
+                const cat = getCategory(item);
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(item);
+            });
+
+            const categoryOrder = ["drinks", "salads", "burgers"];
+            const allCategories = [
+                ...categoryOrder.filter(c => byCategory[c]),
+                ...Object.keys(byCategory).filter(c => !categoryOrder.includes(c))
+            ];
+
+            let categoriesHtml = "";
+            allCategories.forEach(cat => {
+                const itemsHtml = byCategory[cat].map(buildItemHtml).join("");
+                categoriesHtml += `
+                    <div class="section-title category"><span class="bar"></span>${categoryLabel(cat)}</div>
+                    <div class="menu-grid">${itemsHtml}</div>
                 `;
             });
 
             app.innerHTML = `
-                <div class="section-title"><span class="bar"></span>Menu</div>
-                <div class="menu-grid">${itemsHtml}</div>
+                ${categoriesHtml}
                 <div class="action-buttons">
                     <button class="call-btn" id="callBtn" onclick="callWaiter()">🔔 Call Waiter</button>
                     <button class="pay-btn" id="payBtn" onclick="requestPayment()">💳 Request the Bill</button>
