@@ -11,6 +11,22 @@
             color: #1a1a1a;
         }
 
+        .spinner {
+            width: 22px; height: 22px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: #ff6b35;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        .spinner.light { border-color: rgba(255,255,255,0.25); border-top-color: white; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-block {
+            display: flex; flex-direction: column; align-items: center; gap: 14px;
+            padding: 60px 20px; color: #999; font-size: 14px;
+            grid-column: 1 / -1;
+        }
+
         .toast-container {
             position: fixed;
             top: 20px; left: 50%;
@@ -407,7 +423,9 @@
             <span class="bar"></span>Tables
             <span class="count-badge" id="tableCount">0</span>
         </div>
-        <div class="grid" id="tableGrid"></div>
+        <div class="grid" id="tableGrid">
+            <div class="loading-block"><div class="spinner"></div>Loading tables...</div>
+        </div>
     </div>
 
     <div class="overlay" id="overlay">
@@ -422,6 +440,7 @@
         let currentTableId = null;
         let currentAlerts = [];
         let previousAlertKeys = new Set();
+        let isFirstLoad = true;
 
         function playNotificationSound() {
             try {
@@ -525,6 +544,7 @@
             document.getElementById("logDrawerTitle").innerText = "📋 Activity Log";
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
+            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div>Loading...</div>`;
 
             fetch(`${BASE}/activity-log`, { headers: authHeaders() })
                 .then(r => r.json())
@@ -535,6 +555,7 @@
             document.getElementById("logDrawerTitle").innerText = `🕘 ${label} — History`;
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
+            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div>Loading...</div>`;
 
             fetch(`${BASE}/tables/${tableId}/history`, { headers: authHeaders() })
                 .then(r => r.json())
@@ -752,6 +773,7 @@
                         newAlerts.forEach(a => showToast(a));
                     }
                     previousAlertKeys = currentAlertKeys;
+                    isFirstLoad = false;
 
                     document.getElementById("bellCount").innerText = currentAlerts.length;
                     if (document.getElementById("notifDrawer").classList.contains("open")) renderNotifPanel();
@@ -764,6 +786,11 @@
         function openTableModal(tableId, silent) {
             currentTableId = tableId;
             const content = document.getElementById("modalContent");
+
+            if (!silent) {
+                content.innerHTML = `<div class="loading-block"><div class="spinner"></div>Loading...</div>`;
+                document.getElementById("overlay").style.display = "flex";
+            }
 
             fetch(`${BASE}/tables`)
                 .then(r => r.json())
@@ -784,7 +811,6 @@
                             </div>
                             <p id="modalResult"></p>
                         `;
-                        if (!silent) document.getElementById("overlay").style.display = "flex";
                         return;
                     }
 
@@ -798,7 +824,6 @@
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
                                     <p id="modalResult"></p>
                                 `;
-                                if (!silent) document.getElementById("overlay").style.display = "flex";
                                 return;
                             }
 
@@ -855,8 +880,6 @@
                                         </div>
                                         <p id="modalResult"></p>
                                     `;
-
-                                    if (!silent) document.getElementById("overlay").style.display = "flex";
                                 });
                         });
                 });
