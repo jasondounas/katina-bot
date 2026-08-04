@@ -339,6 +339,29 @@ def list_tables():
     return [dict(t) for t in tables]
 
 
+@app.post("/tables/{table_id}/rename")
+def rename_table(table_id: str, display_label: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    if not display_label or not display_label.strip():
+        return {"error": "Name cannot be empty"}
+
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (table_id,))
+    if cur.fetchone() is None:
+        cur.close()
+        conn.close()
+        return {"error": "Table not found"}
+
+    cur.execute("UPDATE tables SET display_label = %s WHERE table_id = %s", (display_label, table_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "renamed table", table_id)
+
+    return {"table_id": table_id, "display_label": display_label}
+
+
 @app.get("/tables/{table_id}/history")
 def get_table_history(table_id: str, _auth: None = Depends(verify_waiter)):
     conn = get_connection()
