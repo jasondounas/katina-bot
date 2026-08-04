@@ -171,6 +171,16 @@
         button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); display: flex; align-items: center; gap: 8px; }
         button.secondary { background: #f0f0f0; color: #555; }
 
+        select {
+            padding: 10px 12px;
+            border: 1.5px solid #eee;
+            border-radius: 10px;
+            font-size: 14px;
+            background: white;
+            margin: 6px 6px 6px 0;
+        }
+        .edit-modal select { width: 100%; margin-bottom: 10px; }
+
         .alert-empty {
             background: white; border-radius: 16px; padding: 24px;
             text-align: center; color: #999; font-size: 14px;
@@ -244,7 +254,7 @@
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
         #itemDesc { width: 220px; }
-        #itemCategory { width: 160px; }
+        #itemCategoryNew { width: 160px; }
 
         .image-source-toggle {
             display: flex;
@@ -337,7 +347,8 @@
             <input type="text" id="itemName" placeholder="Name">
             <input type="number" id="itemPrice" placeholder="Price" step="0.01">
             <input type="text" id="itemDesc" placeholder="Description">
-            <input type="text" id="itemCategory" placeholder="Category (e.g. drinks)">
+            <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
+            <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
 
             <div class="image-source-toggle">
                 <button type="button" id="addSourceUrl" class="active" onclick="setAddImageSource('url')">Image URL</button>
@@ -365,9 +376,10 @@
             <label>Description</label>
             <input type="text" id="editDesc">
             <label>Category</label>
-            <input type="text" id="editCategory" placeholder="e.g. drinks, burgers, salads">
+            <select id="editCategory" onchange="handleCategorySelectChange('edit')"></select>
+            <input type="text" id="editCategoryNew" placeholder="New category name" style="display:none; margin-top:8px;">
 
-            <label>Image</label>
+            <label style="margin-top:10px;">Image</label>
             <div class="image-source-toggle">
                 <button type="button" id="editSourceUrl" class="active" onclick="setEditImageSource('url')">Image URL</button>
                 <button type="button" id="editSourceFile" onclick="setEditImageSource('file')">Upload Photo</button>
@@ -510,6 +522,35 @@
             });
         }
 
+        function getKnownCategories() {
+            const defaults = ["drinks", "salads", "burgers", "other"];
+            const fromItems = (window._menuItemsCache || []).map(i => i.category || "other");
+            return [...new Set([...defaults, ...fromItems])];
+        }
+
+        function populateCategoryDropdowns() {
+            const categories = getKnownCategories();
+            const optionsHtml = categories.map(c => `<option value="${c}">${categoryLabel(c)}</option>`).join("")
+                + `<option value="__new__">+ New category...</option>`;
+
+            document.getElementById("itemCategory").innerHTML = optionsHtml;
+            document.getElementById("editCategory").innerHTML = optionsHtml;
+        }
+
+        function handleCategorySelectChange(prefix) {
+            const select = document.getElementById(`${prefix}Category`);
+            const newInput = document.getElementById(`${prefix}CategoryNew`);
+            newInput.style.display = select.value === "__new__" ? "block" : "none";
+        }
+
+        function getSelectedCategory(prefix) {
+            const select = document.getElementById(`${prefix}Category`);
+            if (select.value === "__new__") {
+                return document.getElementById(`${prefix}CategoryNew`).value.trim() || "other";
+            }
+            return select.value;
+        }
+
         function init() {
             loadStats();
             loadAlerts();
@@ -610,11 +651,13 @@
                 .then(r => r.json())
                 .then(items => {
                     const list = document.getElementById("menuItemsList");
+                    window._menuItemsCache = items;
+                    populateCategoryDropdowns();
+
                     if (!items.length) {
                         list.innerHTML = `<p style="color:#999;">No menu items yet.</p>`;
                         return;
                     }
-                    window._menuItemsCache = items;
 
                     const byCategory = {};
                     items.forEach(item => {
@@ -652,7 +695,7 @@
             const name = document.getElementById("itemName").value.trim();
             const price = parseFloat(document.getElementById("itemPrice").value);
             const desc = document.getElementById("itemDesc").value;
-            const category = document.getElementById("itemCategory").value.trim() || "other";
+            const category = getSelectedCategory("item");
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
 
@@ -683,7 +726,8 @@
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
                     document.getElementById("itemDesc").value = "";
-                    document.getElementById("itemCategory").value = "";
+                    document.getElementById("itemCategoryNew").value = "";
+                    handleCategorySelectChange("item");
                     document.getElementById("itemImageUrl").value = "";
                     document.getElementById("itemImageFile").value = "";
                     document.getElementById("addImagePreview").style.display = "none";
@@ -719,6 +763,8 @@
             document.getElementById("editPrice").value = item.price;
             document.getElementById("editDesc").value = item.description || "";
             document.getElementById("editCategory").value = item.category || "other";
+            document.getElementById("editCategoryNew").value = "";
+            document.getElementById("editCategoryNew").style.display = "none";
             document.getElementById("editImageUrl").value = item.image || "";
             document.getElementById("editImagePreview").style.display = "none";
             document.getElementById("editImageFile").value = "";
@@ -736,7 +782,7 @@
             const name = document.getElementById("editName").value;
             const price = parseFloat(document.getElementById("editPrice").value);
             const desc = document.getElementById("editDesc").value;
-            const category = document.getElementById("editCategory").value.trim() || "other";
+            const category = getSelectedCategory("edit");
             const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("editImageUrl").value : editImageData;
 
