@@ -11,6 +11,22 @@
             color: #1a1a1a;
         }
 
+        .spinner {
+            width: 22px; height: 22px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: #ff6b35;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        .spinner.light { border-color: rgba(255,255,255,0.25); border-top-color: white; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-block {
+            display: flex; flex-direction: column; align-items: center; gap: 14px;
+            padding: 60px 20px; color: #999; font-size: 14px;
+            grid-column: 1 / -1;
+        }
+
         .login-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
@@ -152,7 +168,7 @@
             font-weight: 700;
         }
         button.danger { background: #e74c3c; }
-        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); display: flex; align-items: center; gap: 8px; }
         button.secondary { background: #f0f0f0; color: #555; }
 
         .alert-empty {
@@ -228,7 +244,7 @@
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
         #itemDesc { width: 220px; }
-        #itemCategory { width: 140px; }
+        #itemCategory { width: 160px; }
 
         .image-source-toggle {
             display: flex;
@@ -301,10 +317,12 @@
 
     <div class="container">
 
-        <div class="stats-row" id="statsRow"></div>
+        <div class="stats-row" id="statsRow">
+            <div class="loading-block"><div class="spinner"></div>Loading stats...</div>
+        </div>
 
         <div class="section-title"><span><span class="bar"></span>Live Alerts</span></div>
-        <div id="alertsList"></div>
+        <div id="alertsList"><div class="loading-block"><div class="spinner"></div>Loading...</div></div>
 
         <div class="collapsible-header section-title" style="margin-top:32px;" id="activityHeader" onclick="toggleActivity()">
             <span><span class="bar"></span>Recent Activity</span>
@@ -319,13 +337,7 @@
             <input type="text" id="itemName" placeholder="Name">
             <input type="number" id="itemPrice" placeholder="Price" step="0.01">
             <input type="text" id="itemDesc" placeholder="Description">
-            <input type="text" id="itemCategory" placeholder="Category" list="categoryOptions">
-            <datalist id="categoryOptions">
-                <option value="drinks">
-                <option value="salads">
-                <option value="burgers">
-                <option value="other">
-            </datalist>
+            <input type="text" id="itemCategory" placeholder="Category (e.g. drinks)">
 
             <div class="image-source-toggle">
                 <button type="button" id="addSourceUrl" class="active" onclick="setAddImageSource('url')">Image URL</button>
@@ -336,11 +348,11 @@
             <img class="image-preview" id="addImagePreview">
 
             <br>
-            <button class="primary" onclick="addItem()">+ Add Item</button>
+            <button class="primary" id="addItemBtn" onclick="addItem()">+ Add Item</button>
             <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
 
-        <div id="menuItemsList"></div>
+        <div id="menuItemsList"><div class="loading-block"><div class="spinner"></div>Loading menu...</div></div>
     </div>
 
     <div class="modal-overlay" id="editOverlay">
@@ -353,7 +365,7 @@
             <label>Description</label>
             <input type="text" id="editDesc">
             <label>Category</label>
-            <input type="text" id="editCategory" list="categoryOptions">
+            <input type="text" id="editCategory" placeholder="e.g. drinks, burgers, salads">
 
             <label>Image</label>
             <div class="image-source-toggle">
@@ -365,7 +377,7 @@
             <img class="image-preview" id="editImagePreview">
 
             <div style="display:flex; gap:8px; margin-top:14px;">
-                <button class="primary" onclick="saveEdit()">Save</button>
+                <button class="primary" id="saveEditBtn" onclick="saveEdit()">Save</button>
                 <button class="secondary" onclick="closeEdit()">Cancel</button>
             </div>
             <p id="editResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
@@ -376,7 +388,6 @@
         const BASE = "https://katina-bot.onrender.com";
         let editingItemId = null;
         let activityLoaded = false;
-        let previousAlertCount = 0;
         let addImageData = "";
         let editImageData = "";
 
@@ -515,6 +526,7 @@
             body.classList.toggle("open", !isOpen);
 
             if (!isOpen && !activityLoaded) {
+                body.innerHTML = `<div class="loading-block"><div class="spinner"></div>Loading...</div>`;
                 loadActivity();
                 activityLoaded = true;
             }
@@ -545,14 +557,12 @@
                 sessions.forEach(s => { sessionByTableId[s.table_id] = s; });
 
                 let alertsHtml = "";
-                let alertCount = 0;
                 tables.forEach(t => {
                     const s = sessionByTableId[t.table_id];
                     if (!s) return;
                     const label = t.display_label || t.table_id;
 
                     if (s.waiter_called) {
-                        alertCount++;
                         alertsHtml += `
                             <div class="alert-row called">
                                 <div><div class="table-name">${escapeHtml(label)}</div><div class="type">🔔 Called for a waiter</div></div>
@@ -560,7 +570,6 @@
                         `;
                     }
                     if (s.payment_requested) {
-                        alertCount++;
                         const methodLabel = paymentMethodLabel(s.payment_method);
                         alertsHtml += `
                             <div class="alert-row pay">
@@ -652,6 +661,11 @@
                 return;
             }
 
+            const btn = document.getElementById("addItemBtn");
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;"></div>Adding...`;
+
             fetch(`${BASE}/menu-items`, {
                 method: "POST",
                 headers: authHeadersJson(),
@@ -659,6 +673,8 @@
             })
                 .then(r => r.json())
                 .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                     if (data.error) {
                         document.getElementById("addResult").innerText = data.error;
                         return;
@@ -727,6 +743,11 @@
             const payload = { name, price, description: desc, category };
             if (image) payload.image = image;
 
+            const btn = document.getElementById("saveEditBtn");
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;display:inline-block;"></div>`;
+
             fetch(`${BASE}/menu-items/${editingItemId}/update`, {
                 method: "POST",
                 headers: authHeadersJson(),
@@ -734,6 +755,8 @@
             })
                 .then(r => r.json())
                 .then(data => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
                     if (data.error) {
                         document.getElementById("editResult").innerText = data.error;
                         return;
