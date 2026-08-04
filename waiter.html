@@ -771,10 +771,11 @@
                     const table = tables.find(t => t.table_id === tableId);
                     const label = table ? (table.display_label || table.table_id) : tableId;
                     const safeLabel = escapeHtml(label);
+                    const renameIcon = `<span onclick="renameTable('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:#ff6b35; margin-left:8px;">✏️</span>`;
 
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
-                            <h2>${safeLabel}</h2>
+                            <h2>${safeLabel}${renameIcon}</h2>
                             <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
                             <input type="number" id="quickPartySize" placeholder="party size" value="2" style="width:120px;">
                             <div style="margin-top:12px;">
@@ -792,7 +793,7 @@
                         .then(session => {
                             if (session.error || session.status !== "OPEN") {
                                 content.innerHTML = `
-                                    <h2>${safeLabel}</h2>
+                                    <h2>${safeLabel}${renameIcon}</h2>
                                     <p style="color:#777; font-weight:600; margin:12px 0;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
                                     <p id="modalResult"></p>
@@ -835,7 +836,7 @@
                                     }
 
                                     content.innerHTML = `
-                                        <h2>${safeLabel}</h2>
+                                        <h2>${safeLabel}${renameIcon}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">
                                             👥 ${session.party_size} people
                                             <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">✏️ Edit</span>
@@ -858,6 +859,25 @@
                                     if (!silent) document.getElementById("overlay").style.display = "flex";
                                 });
                         });
+                });
+        }
+
+        function renameTable(tableId, currentLabel) {
+            const newLabel = prompt("Rename table:", currentLabel);
+            if (newLabel === null || !newLabel.trim()) return;
+
+            fetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
                 });
         }
 
