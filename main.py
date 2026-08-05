@@ -217,6 +217,27 @@ def get_activity_log(_auth: None = Depends(verify_waiter)):
     return [dict(l) for l in logs]
 
 
+@app.get("/revenue-stats")
+def get_revenue_stats(_auth: None = Depends(verify_waiter)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+
+    cur.execute("SELECT COALESCE(SUM(price * qty), 0) as total FROM orders WHERE status = 'APPROVED'")
+    total_revenue = cur.fetchone()["total"]
+
+    cur.execute("""
+        SELECT COALESCE(SUM(o.price * o.qty), 0) as unpaid
+        FROM orders o
+        JOIN sessions s ON o.session_id = s.session_id
+        WHERE o.status = 'APPROVED' AND s.status = 'OPEN' AND s.is_paid = 0
+    """)
+    unpaid_amount = cur.fetchone()["unpaid"]
+
+    cur.close()
+    conn.close()
+    return {"total_revenue": float(total_revenue), "unpaid_amount": float(unpaid_amount)}
+
+
 # ---------- Menu Items ----------
 
 @app.post("/menu-items")
