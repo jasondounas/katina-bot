@@ -94,6 +94,26 @@
             color: white;
         }
 
+        .quick-call-btn {
+            position: fixed;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 16;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .quick-call-btn:active { transform: translateY(-50%) scale(0.92); }
+
         .container { padding: 24px; max-width: 540px; margin: 0 auto; }
 
         .missing-session {
@@ -378,6 +398,8 @@
 
     <div class="category-tabs" id="categoryTabs"></div>
 
+    <button class="quick-call-btn" onclick="scrollToActions()">🔔</button>
+
     <div class="container" id="app">
         <div class="loading-block"><div class="spinner"></div>Loading...</div>
     </div>
@@ -540,6 +562,10 @@
             document.getElementById(`cat-${cat}`).scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
+        function scrollToActions() {
+            document.getElementById("actionButtonsSection").scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
         function renderMenu() {
             const app = document.getElementById("app");
             const items = Object.keys(menu);
@@ -579,7 +605,7 @@
 
             app.innerHTML = `
                 ${categoriesHtml}
-                <div class="action-buttons">
+                <div class="action-buttons" id="actionButtonsSection">
                     <button class="call-btn" id="callBtn" onclick="callWaiter()">🔔 Call Waiter</button>
                     <button class="pay-btn" id="payBtn" onclick="requestPayment()">💳 Request the Bill</button>
                 </div>
