@@ -89,6 +89,35 @@
         .section-title.orders .bar { background: #2a9d8f; }
         .section-title.category .bar { background: #7c3aed; }
 
+        .category-header {
+            cursor: pointer;
+            user-select: none;
+        }
+        .category-header .chevron {
+            margin-left: auto;
+            transition: transform 0.2s;
+            font-size: 16px;
+            color: #999;
+        }
+        .category-header.open .chevron {
+            transform: rotate(180deg);
+        }
+        .category-body {
+            display: none;
+        }
+        .category-body.open {
+            display: block;
+        }
+        .category-count {
+            background: #f0f0f0;
+            color: #777;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
         .bill-total {
             background: white;
             border-radius: 18px;
@@ -500,6 +529,15 @@
             `;
         }
 
+        function toggleCategory(cat) {
+            const header = document.querySelector(`.category-header[onclick*="'${cat}'"]`);
+            const body = document.getElementById(`catbody-${cat}`);
+            const isOpen = body.classList.contains("open");
+
+            header.classList.toggle("open", !isOpen);
+            body.classList.toggle("open", !isOpen);
+        }
+
         function renderMenu() {
             const app = document.getElementById("app");
             const items = Object.keys(menu);
@@ -523,11 +561,16 @@
             ];
 
             let categoriesHtml = "";
-            allCategories.forEach(cat => {
+            allCategories.forEach((cat, index) => {
                 const itemsHtml = byCategory[cat].map(buildItemHtml).join("");
+                const isFirst = index === 0;
                 categoriesHtml += `
-                    <div class="section-title category"><span class="bar"></span>${categoryLabel(cat)}</div>
-                    <div class="menu-grid">${itemsHtml}</div>
+                    <div class="section-title category category-header ${isFirst ? 'open' : ''}" onclick="toggleCategory('${cat}')">
+                        <span class="bar"></span>${categoryLabel(cat)}
+                        <span class="category-count">${byCategory[cat].length}</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="menu-grid category-body ${isFirst ? 'open' : ''}" id="catbody-${cat}">${itemsHtml}</div>
                 `;
             });
 
