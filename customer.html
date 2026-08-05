@@ -80,8 +80,9 @@
             margin: 32px 0 18px;
             letter-spacing: -0.5px;
         }
-        .container > .section-title:first-child,
-        .category-section:first-child .section-title { margin-top: 4px; }
+        .container > .section-title:first-child {
+            margin-top: 4px;
+        }
         .section-title .bar {
             width: 5px; height: 24px; border-radius: 3px;
             background: #ff6b35;
@@ -570,7 +571,9 @@
                         <span class="category-count">${byCategory[cat].length}</span>
                         <span class="chevron">▼</span>
                     </div>
-                    <div class="menu-grid category-body ${isFirst ? 'open' : ''}" id="catbody-${cat}">${itemsHtml}</div>
+                    <div class="category-body ${isFirst ? 'open' : ''}" id="catbody-${cat}">
+                        <div class="menu-grid">${itemsHtml}</div>
+                    </div>
                 `;
             });
 
