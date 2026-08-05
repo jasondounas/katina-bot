@@ -109,6 +109,10 @@
         }
         .stat-card .num { font-size: 28px; font-weight: 800; color: #ff6b35; }
         .stat-card .label { font-size: 13px; color: #777; margin-top: 4px; font-weight: 600; }
+        .stat-card.money { background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
+        .stat-card.money .num, .stat-card.money .label { color: white; }
+        .stat-card.money-outstanding { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        .stat-card.money-outstanding .num, .stat-card.money-outstanding .label { color: white; }
 
         .section-title {
             display: flex; align-items: center; justify-content: space-between;
@@ -578,9 +582,12 @@
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
                 fetch(`${BASE}/sessions`).then(r => r.json()),
-            ]).then(([tables, pending, sessions]) => {
+                fetch(`${BASE}/revenue-stats`, { headers: authHeaders() }).then(r => r.json()),
+            ]).then(([tables, pending, sessions, revenue]) => {
                 const occupied = tables.filter(t => t.active_session_id).length;
                 document.getElementById("statsRow").innerHTML = `
+                    <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">Total Revenue</div></div>
+                    <div class="stat-card money-outstanding"><div class="num">€${revenue.unpaid_amount.toFixed(2)}</div><div class="label">Currently Unpaid</div></div>
                     <div class="stat-card"><div class="num">${tables.length}</div><div class="label">Total Tables</div></div>
                     <div class="stat-card"><div class="num">${occupied}</div><div class="label">Occupied</div></div>
                     <div class="stat-card"><div class="num">${sessions.length}</div><div class="label">Open Sessions</div></div>
