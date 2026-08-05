@@ -64,6 +64,36 @@
         .hero .tagline { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
         .hero .tagline-sub { font-size: 13px; color: #b8e8e2; font-weight: 500; }
 
+        .category-tabs {
+            position: sticky;
+            top: 0;
+            z-index: 15;
+            background: #f7f5f2;
+            padding: 14px 24px;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .category-tabs::-webkit-scrollbar { display: none; }
+        .category-tab {
+            flex-shrink: 0;
+            background: white;
+            color: #555;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: background 0.15s, color 0.15s;
+        }
+        .category-tab.active {
+            background: #1a1a1a;
+            color: white;
+        }
+
         .container { padding: 24px; max-width: 540px; margin: 0 auto; }
 
         .missing-session {
@@ -79,6 +109,7 @@
             font-size: 24px; font-weight: 800;
             margin: 32px 0 18px;
             letter-spacing: -0.5px;
+            scroll-margin-top: 70px;
         }
         .container > .section-title:first-child {
             margin-top: 4px;
@@ -89,35 +120,6 @@
         }
         .section-title.orders .bar { background: #2a9d8f; }
         .section-title.category .bar { background: #7c3aed; }
-
-        .category-header {
-            cursor: pointer;
-            user-select: none;
-        }
-        .category-header .chevron {
-            margin-left: auto;
-            transition: transform 0.2s;
-            font-size: 16px;
-            color: #999;
-        }
-        .category-header.open .chevron {
-            transform: rotate(180deg);
-        }
-        .category-body {
-            display: none;
-        }
-        .category-body.open {
-            display: block;
-        }
-        .category-count {
-            background: #f0f0f0;
-            color: #777;
-            font-size: 12px;
-            font-weight: 700;
-            padding: 3px 10px;
-            border-radius: 20px;
-            margin-left: 6px;
-        }
 
         .bill-total {
             background: white;
@@ -374,6 +376,8 @@
         </div>
     </div>
 
+    <div class="category-tabs" id="categoryTabs"></div>
+
     <div class="container" id="app">
         <div class="loading-block"><div class="spinner"></div>Loading...</div>
     </div>
@@ -530,13 +534,10 @@
             `;
         }
 
-        function toggleCategory(cat) {
-            const header = document.querySelector(`.category-header[onclick*="'${cat}'"]`);
-            const body = document.getElementById(`catbody-${cat}`);
-            const isOpen = body.classList.contains("open");
-
-            header.classList.toggle("open", !isOpen);
-            body.classList.toggle("open", !isOpen);
+        function scrollToCategory(cat) {
+            document.querySelectorAll(".category-tab").forEach(el => el.classList.remove("active"));
+            document.getElementById(`tab-${cat}`).classList.add("active");
+            document.getElementById(`cat-${cat}`).scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
         function renderMenu() {
@@ -561,21 +562,20 @@
                 ...Object.keys(byCategory).filter(c => !categoryOrder.includes(c))
             ];
 
+            const tabsHtml = allCategories.map((cat, i) => `
+                <button class="category-tab ${i === 0 ? 'active' : ''}" id="tab-${cat}" onclick="scrollToCategory('${cat}')">${categoryLabel(cat)}</button>
+            `).join("");
+
             let categoriesHtml = "";
-            allCategories.forEach((cat, index) => {
+            allCategories.forEach(cat => {
                 const itemsHtml = byCategory[cat].map(buildItemHtml).join("");
-                const isFirst = index === 0;
                 categoriesHtml += `
-                    <div class="section-title category category-header ${isFirst ? 'open' : ''}" onclick="toggleCategory('${cat}')">
-                        <span class="bar"></span>${categoryLabel(cat)}
-                        <span class="category-count">${byCategory[cat].length}</span>
-                        <span class="chevron">▼</span>
-                    </div>
-                    <div class="category-body ${isFirst ? 'open' : ''}" id="catbody-${cat}">
-                        <div class="menu-grid">${itemsHtml}</div>
-                    </div>
+                    <div class="section-title category" id="cat-${cat}"><span class="bar"></span>${categoryLabel(cat)}</div>
+                    <div class="menu-grid">${itemsHtml}</div>
                 `;
             });
+
+            document.getElementById("categoryTabs").innerHTML = tabsHtml;
 
             app.innerHTML = `
                 ${categoriesHtml}
