@@ -248,21 +248,6 @@
             gap: 16px;
         }
 
-        .add-tile {
-            border: 2.5px dashed #ddd;
-            border-radius: 20px;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            padding: 30px 18px;
-            cursor: pointer;
-            color: #999;
-            transition: transform 0.15s, border-color 0.15s, color 0.15s;
-            min-height: 140px;
-        }
-        .add-tile:hover { border-color: #ff6b35; color: #ff6b35; transform: translateY(-3px); }
-        .add-tile .plus { font-size: 32px; font-weight: 300; line-height: 1; margin-bottom: 6px; }
-        .add-tile .label { font-size: 14px; font-weight: 700; }
-
         .card {
             background: white;
             border-radius: 20px;
@@ -432,7 +417,7 @@
             <span class="count-badge" id="tableCount">0</span>
         </div>
         <div class="grid" id="tableGrid">
-            <div class="loading-block"><div class="spinner"></div>Loading...</div>
+            <div class="loading-block"><div class="spinner"></div></div>
         </div>
     </div>
 
@@ -469,7 +454,6 @@
                 no_activity: "Δεν υπάρχει δραστηριότητα ακόμα.",
                 no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
                 tables: "Τραπέζια",
-                register_table: "Καταχώρηση Τραπεζιού",
                 empty: "🟢 Άδειο",
                 paid: "💰 Πληρωμένο",
                 unpaid: "❌ Απλήρωτο",
@@ -489,7 +473,6 @@
                 table_empty_msg: "🟢 Αυτό το τραπέζι είναι αδειανό αυτή τη στιγμή.",
                 party_size_placeholder: "αριθμός ατόμων",
                 open_session: "Άνοιγμα Συνεδρίας",
-                delete_table: "Διαγραφή Τραπεζιού",
                 session_ended_msg: (s) => `⏹️ Αυτή η συνεδρία έχει τελειώσει (${s}), αλλά το τραπέζι δεν έχει απελευθερωθεί ακόμα.`,
                 release_table: "Απελευθέρωση Τραπεζιού",
                 edit: "✏️ Επεξεργασία",
@@ -508,17 +491,11 @@
                 close_session: "Κλείσιμο Συνεδρίας",
                 delete_session: "Διαγραφή Συνεδρίας",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
-                register_table_title: "Καταχώρηση Νέου Τραπεζιού",
-                register_table_sub: "Μία φορά μόνο — αυτό το τραπέζι μένει για πάντα, οι συνεδρίες έρχονται και φεύγουν πάνω σε αυτό.",
-                table_id_placeholder: "id τραπεζιού (π.χ. Τ-1)",
-                table_label_placeholder: "εμφανιζόμενο όνομα (προαιρετικό)",
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
-                delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
                 delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
                 split_result: (t, p, n) => `Σύνολο: €${t} — €${p} ανά άτομο (${n} άτομα)`,
                 session_closed_msg: "Η συνεδρία έκλεισε. Μπορείτε να απελευθερώσετε το τραπέζι τώρα.",
-                enter_table_id: "Εισάγετε id τραπεζιού",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -555,7 +532,6 @@
                 no_activity: "No activity yet.",
                 no_alerts: "No active alerts 🎉",
                 tables: "Tables",
-                register_table: "Register Table",
                 empty: "🟢 Empty",
                 paid: "💰 Paid",
                 unpaid: "❌ Unpaid",
@@ -575,7 +551,6 @@
                 table_empty_msg: "🟢 This table is currently empty.",
                 party_size_placeholder: "party size",
                 open_session: "Open Session",
-                delete_table: "Delete Table",
                 session_ended_msg: (s) => `⏹️ This session has ended (${s}), but the table hasn't been released yet.`,
                 release_table: "Release Table",
                 edit: "✏️ Edit",
@@ -594,17 +569,11 @@
                 close_session: "Close Session",
                 delete_session: "Delete Session",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
-                register_table_title: "Register a New Table",
-                register_table_sub: "One-time setup — this table stays forever, sessions come and go on top of it.",
-                table_id_placeholder: "table id (e.g. T-1)",
-                table_label_placeholder: "display name (optional)",
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
-                delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
                 delete_session_confirm: "Delete this session? This cancels all its orders.",
                 split_result: (t, p, n) => `Total: €${t} — €${p} per person (${n} people)`,
                 session_closed_msg: "Session closed. You can release the table now.",
-                enter_table_id: "Enter a table id",
                 action_labels: {}
             }
         };
@@ -789,41 +758,6 @@
             document.getElementById("bellBtn").classList.remove("active");
         }
 
-        function openAddTableModal() {
-            currentTableId = null;
-            document.getElementById("modalContent").innerHTML = `
-                <h2>${t("register_table_title")}</h2>
-                <p style="color:#777; margin:8px 0 16px; font-size:14px;">${t("register_table_sub")}</p>
-                <input type="text" id="newTableId" placeholder="${t("table_id_placeholder")}">
-                <input type="text" id="newTableLabel" placeholder="${t("table_label_placeholder")}">
-                <div style="margin-top:16px;">
-                    <button class="primary" onclick="registerTable()">${t("register_table")}</button>
-                </div>
-                <p id="modalResult"></p>
-            `;
-            document.getElementById("overlay").style.display = "flex";
-        }
-
-        function registerTable() {
-            const tableId = document.getElementById("newTableId").value;
-            const label = document.getElementById("newTableLabel").value;
-            if (!tableId) return alert(t("enter_table_id"));
-
-            fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, {
-                method: "POST",
-                headers: authHeaders()
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById("modalResult").innerText = data.error;
-                        return;
-                    }
-                    closeModal();
-                    loadTables();
-                });
-        }
-
         function toggleNotifPanel() {
             const drawer = document.getElementById("notifDrawer");
             const overlay = document.getElementById("drawerOverlay");
@@ -889,12 +823,11 @@
 
                     currentAlerts = [];
                     const grid = document.getElementById("tableGrid");
-                    grid.innerHTML = `
-                        <div class="add-tile" onclick="openAddTableModal()">
-                            <div class="plus">+</div>
-                            <div class="label">${t("register_table")}</div>
-                        </div>
-                    `;
+                    grid.innerHTML = "";
+
+                    if (tables.length === 0) {
+                        grid.innerHTML = `<div class="loading-block">—</div>`;
+                    }
 
                     tables.forEach(tbl => {
                         const label = tbl.display_label || tbl.table_id;
@@ -1009,7 +942,6 @@
                             <input type="number" id="quickPartySize" placeholder="${t("party_size_placeholder")}" value="2" style="width:120px;">
                             <div style="margin-top:12px;">
                                 <button class="success" onclick="openSessionForCurrentTable()">${t("open_session")}</button>
-                                <button class="danger" onclick="deleteTable('${tableId}')">${t("delete_table")}</button>
                             </div>
                             <p id="modalResult"></p>
                         `;
@@ -1139,23 +1071,6 @@
                         return;
                     }
                     openTableModal(currentTableId);
-                    loadTables();
-                });
-        }
-
-        function deleteTable(tableId) {
-            if (!confirm(t("delete_table_confirm", tableId))) return;
-            fetch(`${BASE}/tables/${tableId}`, {
-                method: "DELETE",
-                headers: authHeaders()
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById("modalResult").innerText = data.error;
-                        return;
-                    }
-                    closeModal();
                     loadTables();
                 });
         }

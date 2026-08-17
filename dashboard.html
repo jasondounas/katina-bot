@@ -233,6 +233,23 @@
         .activity-row .action { font-size: 14px; margin-top: 3px; }
         .activity-row .time { color: #aaa; font-size: 11.5px; margin-top: 3px; }
 
+        .table-row {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        }
+        .table-row .info .name { font-weight: 700; font-size: 15px; }
+        .table-row .info .status { font-size: 12.5px; margin-top: 2px; font-weight: 600; }
+        .table-row .info .status.occupied { color: #c0392b; }
+        .table-row .info .status.empty { color: #1d7d72; }
+        .table-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+
         .menu-item-row {
             background: white;
             border-radius: 16px;
@@ -275,6 +292,7 @@
         #itemPrice { width: 90px; }
         #itemDesc { width: 220px; }
         #itemCategoryNew { width: 160px; }
+        #newTableId, #newTableLabel { width: 160px; }
 
         .image-source-toggle {
             display: flex;
@@ -355,6 +373,17 @@
 
         <div class="section-title"><span><span class="bar"></span><span id="liveAlertsTitle">Live Alerts</span></span></div>
         <div id="alertsList"><div class="loading-block"><div class="spinner"></div></div></div>
+
+        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="tablesTitle">Tables</span></span></div>
+
+        <div class="add-form">
+            <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
+            <input type="text" id="newTableLabel" placeholder="display name (optional)">
+            <button class="primary" id="addTableBtn" onclick="addTable()">+ Register Table</button>
+            <p id="addTableResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+        </div>
+
+        <div id="tablesList"><div class="loading-block"><div class="spinner"></div></div></div>
 
         <div class="collapsible-header section-title" style="margin-top:32px;" id="activityHeader" onclick="toggleActivity()">
             <span><span class="bar"></span><span id="recentActivityTitle">Recent Activity</span></span>
@@ -445,11 +474,13 @@
                 open_sessions: "Ανοιχτές Συνεδρίες",
                 pending_orders: "Εκκρεμείς Παραγγελίες",
                 live_alerts: "Ζωντανές Ειδοποιήσεις",
+                tables: "Τραπέζια",
                 recent_activity: "Πρόσφατη Δραστηριότητα",
                 menu_items: "Προϊόντα Μενού",
                 no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
                 no_activity: "Δεν υπάρχει δραστηριότητα ακόμα.",
                 no_items: "Δεν υπάρχουν προϊόντα μενού ακόμα.",
+                no_tables: "Δεν υπάρχουν τραπέζια ακόμα.",
                 called_for_waiter: "🔔 Κάλεσε σερβιτόρο",
                 wants_to_pay: (m) => `💳 Θέλει να πληρώσει${m ? " — " + m : ""}`,
                 cash: "💵 Μετρητά",
@@ -482,6 +513,17 @@
                 delete_confirm: (id) => `Οριστική διαγραφή "${id}";`,
                 new_category_option: "+ Νέα κατηγορία...",
                 category_labels: { drinks: "🥤 Ποτά", salads: "🥗 Σαλάτες", burgers: "🍔 Μπέργκερ", other: "🍽️ Άλλο" },
+                table_id_placeholder: "id τραπεζιού (π.χ. Τ-1)",
+                table_label_placeholder: "εμφανιζόμενο όνομα (προαιρετικό)",
+                register_table: "+ Καταχώρηση Τραπεζιού",
+                registering: "Καταχώρηση...",
+                enter_table_id: "Εισάγετε id τραπεζιού",
+                occupied_status: "Κατειλημμένο",
+                empty_status: "Άδειο",
+                rename: "Μετονομασία",
+                rename_prompt: "Μετονομασία τραπεζιού:",
+                delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
+                cannot_delete_occupied: "Δεν είναι δυνατή η διαγραφή τραπεζιού με ενεργή συνεδρία — απελευθερώστε το πρώτα.",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -518,11 +560,13 @@
                 open_sessions: "Open Sessions",
                 pending_orders: "Pending Orders",
                 live_alerts: "Live Alerts",
+                tables: "Tables",
                 recent_activity: "Recent Activity",
                 menu_items: "Menu Items",
                 no_alerts: "No active alerts 🎉",
                 no_activity: "No activity yet.",
                 no_items: "No menu items yet.",
+                no_tables: "No tables yet.",
                 called_for_waiter: "🔔 Called for a waiter",
                 wants_to_pay: (m) => `💳 Wants to pay${m ? " — " + m : ""}`,
                 cash: "💵 Cash",
@@ -555,6 +599,17 @@
                 delete_confirm: (id) => `Delete "${id}" permanently?`,
                 new_category_option: "+ New category...",
                 category_labels: { drinks: "🥤 Drinks", salads: "🥗 Salads", burgers: "🍔 Burgers", other: "🍽️ Other" },
+                table_id_placeholder: "table id (e.g. T-1)",
+                table_label_placeholder: "display name (optional)",
+                register_table: "+ Register Table",
+                registering: "Registering...",
+                enter_table_id: "Enter a table id",
+                occupied_status: "Occupied",
+                empty_status: "Empty",
+                rename: "Rename",
+                rename_prompt: "Rename table:",
+                delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
+                cannot_delete_occupied: "Cannot delete a table with an active session — release it first.",
                 action_labels: {}
             }
         };
@@ -572,6 +627,7 @@
                 loadStats();
                 loadAlerts();
                 loadMenuItems();
+                loadTablesManagement();
                 if (activityLoaded) loadActivity();
             }
         }
@@ -587,8 +643,12 @@
             document.getElementById("unlockBtn").innerText = t("unlock");
             document.getElementById("headerTitle").innerText = t("dashboard_title");
             document.getElementById("liveAlertsTitle").innerText = t("live_alerts");
+            document.getElementById("tablesTitle").innerText = t("tables");
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
             document.getElementById("menuItemsTitle").innerText = t("menu_items");
+            document.getElementById("newTableId").placeholder = t("table_id_placeholder");
+            document.getElementById("newTableLabel").placeholder = t("table_label_placeholder");
+            document.getElementById("addTableBtn").innerText = t("register_table");
             document.getElementById("itemId").placeholder = t("id_placeholder");
             document.getElementById("itemName").placeholder = t("name_field_placeholder");
             document.getElementById("itemPrice").placeholder = t("price_placeholder");
@@ -770,6 +830,7 @@
         function init() {
             loadStats();
             loadAlerts();
+            loadTablesManagement();
             loadMenuItems();
             setInterval(() => { loadStats(); loadAlerts(); }, 8000);
         }
@@ -862,6 +923,98 @@
                             </div>
                         `;
                     }).join("");
+                });
+        }
+
+        function loadTablesManagement() {
+            Promise.all([
+                fetch(`${BASE}/tables`).then(r => r.json()),
+            ]).then(([tables]) => {
+                window._tablesCache = tables;
+                const list = document.getElementById("tablesList");
+                if (!tables.length) {
+                    list.innerHTML = `<p style="color:#999;">${t("no_tables")}</p>`;
+                    return;
+                }
+                list.innerHTML = tables.map(tbl => {
+                    const occupied = !!tbl.active_session_id;
+                    const label = tbl.display_label || tbl.table_id;
+                    return `
+                        <div class="table-row">
+                            <div class="info">
+                                <div class="name">${escapeHtml(label)}</div>
+                                <div class="status ${occupied ? 'occupied' : 'empty'}">${occupied ? t("occupied_status") : t("empty_status")}</div>
+                            </div>
+                            <div class="actions">
+                                <button class="secondary" onclick="renameTableFromDashboard('${tbl.table_id}', '${escapeHtml(label)}')">${t("rename")}</button>
+                                <button class="danger" onclick="deleteTableFromDashboard('${tbl.table_id}', ${occupied})">${t("delete")}</button>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            });
+        }
+
+        function addTable() {
+            const id = document.getElementById("newTableId").value.trim();
+            const label = document.getElementById("newTableLabel").value.trim();
+            if (!id) {
+                document.getElementById("addTableResult").innerText = t("enter_table_id");
+                return;
+            }
+
+            const btn = document.getElementById("addTableBtn");
+            const originalText = t("register_table");
+            btn.disabled = true;
+            btn.innerText = t("registering");
+
+            fetch(`${BASE}/tables?table_id=${encodeURIComponent(id)}&display_label=${encodeURIComponent(label || id)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (data.error) {
+                        document.getElementById("addTableResult").innerText = data.error;
+                        return;
+                    }
+                    document.getElementById("newTableId").value = "";
+                    document.getElementById("newTableLabel").value = "";
+                    document.getElementById("addTableResult").innerText = "";
+                    loadTablesManagement();
+                    loadStats();
+                });
+        }
+
+        function renameTableFromDashboard(tableId, currentLabel) {
+            const newLabel = prompt(t("rename_prompt"), currentLabel);
+            if (newLabel === null || !newLabel.trim()) return;
+
+            fetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(() => loadTablesManagement());
+        }
+
+        function deleteTableFromDashboard(tableId, occupied) {
+            if (occupied) {
+                alert(t("cannot_delete_occupied"));
+                return;
+            }
+            if (!confirm(t("delete_table_confirm", tableId))) return;
+
+            fetch(`${BASE}/tables/${tableId}`, {
+                method: "DELETE",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(() => {
+                    loadTablesManagement();
+                    loadStats();
                 });
         }
 
