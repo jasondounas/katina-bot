@@ -488,14 +488,12 @@
                 by: (n) => `από ${n}`,
                 calculate_split: "Υπολογισμός Μοιράσματος",
                 mark_paid: "Σήμανση ως Πληρωμένο",
-                close_session: "Κλείσιμο Συνεδρίας",
                 delete_session: "Διαγραφή Συνεδρίας",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
                 delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
                 split_result: (t, p, n) => `Σύνολο: €${t} — €${p} ανά άτομο (${n} άτομα)`,
-                session_closed_msg: "Η συνεδρία έκλεισε. Μπορείτε να απελευθερώσετε το τραπέζι τώρα.",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -504,7 +502,7 @@
                     "opened session": "άνοιξε συνεδρία",
                     "updated party size": "ενημέρωσε αριθμό ατόμων",
                     "deleted session": "διέγραψε συνεδρία",
-                    "marked paid": "σήμανε ως πληρωμένο",
+                    "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "closed session": "έκλεισε συνεδρία",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
@@ -566,14 +564,12 @@
                 by: (n) => `by ${n}`,
                 calculate_split: "Calculate Split",
                 mark_paid: "Mark Paid",
-                close_session: "Close Session",
                 delete_session: "Delete Session",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
                 delete_session_confirm: "Delete this session? This cancels all its orders.",
                 split_result: (t, p, n) => `Total: €${t} — €${p} per person (${n} people)`,
-                session_closed_msg: "Session closed. You can release the table now.",
                 action_labels: {}
             }
         };
@@ -1009,7 +1005,6 @@
                                         <div class="action-row">
                                             <button class="secondary" onclick="calculateSplit('${session.session_id}')">${t("calculate_split")}</button>
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
-                                            <button onclick="closeSession('${session.session_id}')">${t("close_session")}</button>
                                             <button class="danger" onclick="deleteSession('${session.session_id}')">${t("delete_session")}</button>
                                         </div>
                                         <p id="modalResult"></p>
@@ -1126,20 +1121,7 @@
                 headers: authHeaders()
             })
                 .then(r => r.json())
-                .then(() => { openTableModal(currentTableId); loadTables(); });
-        }
-
-        function closeSession(sessionId) {
-            fetch(`${BASE}/sessions/${sessionId}/close`, {
-                method: "POST",
-                headers: authHeaders()
-            })
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById("modalResult").innerText = data.error || t("session_closed_msg");
-                    openTableModal(currentTableId);
-                    loadTables();
-                });
+                .then(() => { closeModal(); loadTables(); });
         }
 
         function deleteSession(sessionId) {
