@@ -27,6 +27,31 @@
             grid-column: 1 / -1;
         }
 
+        textarea {
+            font-family: inherit;
+            resize: none;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+        .add-form textarea {
+            padding: 10px 12px;
+            border: 1.5px solid #eee;
+            border-radius: 10px;
+            font-size: 14px;
+            margin: 6px 6px 6px 0;
+            width: 220px;
+            min-height: 40px;
+        }
+        .edit-modal textarea {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            border: 1.5px solid #eee;
+            border-radius: 10px;
+            font-size: 14px;
+            min-height: 40px;
+        }
+
         .login-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
@@ -290,7 +315,6 @@
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
-        #itemDesc { width: 220px; }
         #itemCategoryNew { width: 160px; }
         #newTableId, #newTableLabel { width: 160px; }
 
@@ -397,7 +421,7 @@
             <input type="text" id="itemId" placeholder="id (e.g. fries)">
             <input type="text" id="itemName" placeholder="Name">
             <input type="number" id="itemPrice" placeholder="Price" step="0.01">
-            <input type="text" id="itemDesc" placeholder="Description">
+            <textarea id="itemDesc" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
             <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
             <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
 
@@ -425,7 +449,7 @@
             <label id="editPriceLabel">Price</label>
             <input type="number" id="editPrice" step="0.01">
             <label id="editDescLabel">Description</label>
-            <input type="text" id="editDesc">
+            <textarea id="editDesc" oninput="autoGrow(this)"></textarea>
             <label id="editCategoryLabel">Category</label>
             <select id="editCategory" onchange="handleCategorySelectChange('edit')"></select>
             <input type="text" id="editCategoryNew" placeholder="New category name" style="display:none; margin-top:8px;">
@@ -455,6 +479,11 @@
         let editImageData = "";
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
+
+        function autoGrow(el) {
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+        }
 
         const T = {
             gr: {
@@ -532,8 +561,7 @@
                     "opened session": "άνοιξε συνεδρία",
                     "updated party size": "ενημέρωσε αριθμό ατόμων",
                     "deleted session": "διέγραψε συνεδρία",
-                    "marked paid": "σήμανε ως πληρωμένο",
-                    "closed session": "έκλεισε συνεδρία",
+                    "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
                     "rejected order": "απέρριψε παραγγελία",
@@ -1098,6 +1126,7 @@
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
                     document.getElementById("itemDesc").value = "";
+                    document.getElementById("itemDesc").style.height = "auto";
                     document.getElementById("itemCategoryNew").value = "";
                     handleCategorySelectChange("item");
                     document.getElementById("itemImageUrl").value = "";
@@ -1134,6 +1163,7 @@
             document.getElementById("editName").value = item.name;
             document.getElementById("editPrice").value = item.price;
             document.getElementById("editDesc").value = item.description || "";
+            autoGrow(document.getElementById("editDesc"));
             document.getElementById("editCategory").value = item.category || "other";
             document.getElementById("editCategoryNew").value = "";
             document.getElementById("editCategoryNew").style.display = "none";
