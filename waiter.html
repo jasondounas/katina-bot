@@ -471,7 +471,6 @@
                 orders_awaiting: (n) => `${n} παραγγελία(ες) προς έλεγχο`,
                 needs_release_short: "Χρειάζεται απελευθέρωση",
                 table_empty_msg: "🟢 Αυτό το τραπέζι είναι άδειο αυτή τη στιγμή.",
-                party_size_placeholder: "αριθμός ατόμων",
                 open_session: "Άνοιγμα Τραπεζιού",
                 session_ended_msg: (s) => `⏹️ Αυτή η συνεδρία έχει τελειώσει (${s}), αλλά το τραπέζι δεν έχει απελευθερωθεί ακόμα.`,
                 release_table: "Απελευθέρωση Τραπεζιού",
@@ -544,7 +543,6 @@
                 orders_awaiting: (n) => `${n} order(s) awaiting review`,
                 needs_release_short: "Needs release",
                 table_empty_msg: "🟢 This table is currently empty.",
-                party_size_placeholder: "party size",
                 open_session: "Open Session",
                 session_ended_msg: (s) => `⏹️ This session has ended (${s}), but the table hasn't been released yet.`,
                 release_table: "Release Table",
@@ -930,7 +928,6 @@
                         content.innerHTML = `
                             <h2>${safeLabel}${renameIcon}</h2>
                             <p style="color:#1d7d72; font-weight:600; margin:12px 0;">${t("table_empty_msg")}</p>
-                            <input type="number" id="quickPartySize" placeholder="${t("party_size_placeholder")}" value="2" style="width:120px;">
                             <div style="margin-top:12px;">
                                 <button class="success" onclick="openSessionForCurrentTable()">${t("open_session")}</button>
                             </div>
@@ -1047,7 +1044,7 @@
         }
 
         function openSessionForCurrentTable() {
-            const partySize = document.getElementById("quickPartySize").value;
+            const partySize = 2;
 
             fetch(`${BASE}/sessions/open?table_id=${currentTableId}&party_size=${partySize}`, {
                 method: "POST",
