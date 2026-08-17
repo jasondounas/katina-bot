@@ -111,6 +111,12 @@
             cursor: pointer;
         }
         .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+        .login-lang-toggle {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(255,255,255,0.1); color: white; border: none;
+            padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+            cursor: pointer;
+        }
 
         header {
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
@@ -136,7 +142,7 @@
         header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
 
         .header-actions { display: flex; gap: 8px; align-items: center; }
-        .bell-btn, .log-btn {
+        .bell-btn, .log-btn, .lang-btn {
             background: rgba(255,255,255,0.1);
             border: none;
             color: white;
@@ -373,13 +379,14 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <div class="login-screen" id="loginScreen">
+        <button class="login-lang-toggle" onclick="toggleLang()" id="loginLangBtn">EN</button>
         <div class="login-box">
             <div class="logo">🍽️</div>
-            <h2>Staff Login</h2>
-            <p>Enter the staff code and your name once — this device will remember them.</p>
+            <h2 id="loginTitle">Staff Login</h2>
+            <p id="loginSub">Enter the staff code and your name once — this device will remember them.</p>
             <input type="text" id="nameInput" placeholder="Your name">
             <input type="password" id="loginInput" placeholder="Staff code" onkeydown="if(event.key==='Enter') doLogin()">
-            <button onclick="doLogin()">Unlock</button>
+            <button onclick="doLogin()" id="unlockBtn">Unlock</button>
             <div class="login-error" id="loginError"></div>
         </div>
     </div>
@@ -388,11 +395,12 @@
         <div class="brand">
             <div class="logo">🍽️</div>
             <div>
-                <h1>Katina — Waiter</h1>
+                <h1 id="headerTitle">Katina — Waiter</h1>
                 <div class="whoami" id="whoamiLabel"></div>
             </div>
         </div>
         <div class="header-actions">
+            <button class="lang-btn" onclick="toggleLang()" id="langBtn">EN</button>
             <button class="log-btn" onclick="openActivityLog()">📋</button>
             <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
                 🔔 <span class="bell-count" id="bellCount">0</span>
@@ -404,7 +412,7 @@
 
     <div class="notif-drawer" id="notifDrawer">
         <div class="drawer-header">
-            <h2>🔔 Notifications</h2>
+            <h2 id="notifDrawerTitle">🔔 Notifications</h2>
             <span class="drawer-close" onclick="closeAllDrawers()">✕</span>
         </div>
         <div id="notifList"></div>
@@ -420,11 +428,11 @@
 
     <div class="container">
         <div class="section-title">
-            <span class="bar"></span>Tables
+            <span class="bar"></span><span id="tablesTitle">Tables</span>
             <span class="count-badge" id="tableCount">0</span>
         </div>
         <div class="grid" id="tableGrid">
-            <div class="loading-block"><div class="spinner"></div>Loading tables...</div>
+            <div class="loading-block"><div class="spinner"></div>Loading...</div>
         </div>
     </div>
 
@@ -440,7 +448,197 @@
         let currentTableId = null;
         let currentAlerts = [];
         let previousAlertKeys = new Set();
-        let isFirstLoad = true;
+
+        let currentLang = localStorage.getItem("katinaLang") || "gr";
+
+        const T = {
+            gr: {
+                login_title: "Σύνδεση Προσωπικού",
+                login_sub: "Εισάγετε τον κωδικό προσωπικού και το όνομά σας μία φορά — αυτή η συσκευή θα τα θυμάται.",
+                name_placeholder: "Το όνομά σας",
+                code_placeholder: "Κωδικός προσωπικού",
+                unlock: "Ξεκλείδωμα",
+                enter_name: "Παρακαλώ εισάγετε το όνομά σας.",
+                wrong_code: "Λάθος κωδικός, δοκιμάστε ξανά.",
+                waiter_title: "Katina — Σερβιτόρος",
+                logged_in_as: (n) => `Συνδεδεμένος ως ${n}`,
+                notifications: "🔔 Ειδοποιήσεις",
+                activity_log: "📋 Ιστορικό Δραστηριότητας",
+                history_for: (l) => `🕘 ${l} — Ιστορικό`,
+                no_history: "Δεν υπάρχει ιστορικό για αυτό το τραπέζι ακόμα.",
+                no_activity: "Δεν υπάρχει δραστηριότητα ακόμα.",
+                no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
+                tables: "Τραπέζια",
+                register_table: "Καταχώρηση Τραπεζιού",
+                empty: "🟢 Άδειο",
+                paid: "💰 Πληρωμένο",
+                unpaid: "❌ Απλήρωτο",
+                people: (n) => `👥 ${n}`,
+                pending_short: (n) => `🧾 ${n} εκκρ.`,
+                calling_waiter: "🔔 ΚΑΛΕΙ ΣΕΡΒΙΤΟΡΟ",
+                wants_to_pay: (m) => `💳 ΘΕΛΕΙ ΝΑ ΠΛΗΡΩΣΕΙ${m ? " — " + m : ""}`,
+                new_orders: (n) => `🧾 ${n} ΝΕΑ ΠΑΡΑΓΓΕΛΙΑ${n > 1 ? "ΕΣ" : ""}`,
+                needs_release: "⏹️ ΧΡΕΙΑΖΕΤΑΙ ΑΠΕΛΕΥΘΕΡΩΣΗ",
+                session_status: (s) => `Συνεδρία: ${s}`,
+                cash: "💵 Μετρητά",
+                card: "💳 Κάρτα",
+                called_for_waiter: "Κάλεσε σερβιτόρο",
+                requested_bill: (m) => `Ζήτησε τον λογαριασμό${m ? " (" + m + ")" : ""}`,
+                orders_awaiting: (n) => `${n} παραγγελία(ες) προς έλεγχο`,
+                needs_release_short: "Χρειάζεται απελευθέρωση",
+                table_empty_msg: "🟢 Αυτό το τραπέζι είναι αδειανό αυτή τη στιγμή.",
+                party_size_placeholder: "αριθμός ατόμων",
+                open_session: "Άνοιγμα Συνεδρίας",
+                delete_table: "Διαγραφή Τραπεζιού",
+                session_ended_msg: (s) => `⏹️ Αυτή η συνεδρία έχει τελειώσει (${s}), αλλά το τραπέζι δεν έχει απελευθερωθεί ακόμα.`,
+                release_table: "Απελευθέρωση Τραπεζιού",
+                edit: "✏️ Επεξεργασία",
+                bill_so_far: (a) => `💶 Λογαριασμός μέχρι τώρα: €${a}`,
+                customer_link: "Σύνδεσμος πελάτη ↗",
+                table_called_msg: "🔔 Αυτό το τραπέζι κάλεσε σερβιτόρο.",
+                acknowledge: "Επιβεβαίωση",
+                table_requested_bill_msg: (m) => `💳 Αυτό το τραπέζι ζήτησε τον λογαριασμό${m ? " — " + m : ""}.`,
+                orders_heading: "Παραγγελίες",
+                no_orders: "Δεν υπάρχουν παραγγελίες ακόμα.",
+                accept: "Αποδοχή",
+                reject: "Απόρριψη",
+                by: (n) => `από ${n}`,
+                calculate_split: "Υπολογισμός Μοιράσματος",
+                mark_paid: "Σήμανση ως Πληρωμένο",
+                close_session: "Κλείσιμο Συνεδρίας",
+                delete_session: "Διαγραφή Συνεδρίας",
+                status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
+                register_table_title: "Καταχώρηση Νέου Τραπεζιού",
+                register_table_sub: "Μία φορά μόνο — αυτό το τραπέζι μένει για πάντα, οι συνεδρίες έρχονται και φεύγουν πάνω σε αυτό.",
+                table_id_placeholder: "id τραπεζιού (π.χ. Τ-1)",
+                table_label_placeholder: "εμφανιζόμενο όνομα (προαιρετικό)",
+                rename_prompt: "Μετονομασία τραπεζιού:",
+                party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
+                delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
+                delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
+                split_result: (t, p, n) => `Σύνολο: €${t} — €${p} ανά άτομο (${n} άτομα)`,
+                session_closed_msg: "Η συνεδρία έκλεισε. Μπορείτε να απελευθερώσετε το τραπέζι τώρα.",
+                enter_table_id: "Εισάγετε id τραπεζιού",
+                action_labels: {
+                    "registered table": "καταχώρησε τραπέζι",
+                    "deleted table": "διέγραψε τραπέζι",
+                    "released table": "απελευθέρωσε τραπέζι",
+                    "renamed table": "μετονόμασε τραπέζι",
+                    "opened session": "άνοιξε συνεδρία",
+                    "updated party size": "ενημέρωσε αριθμό ατόμων",
+                    "deleted session": "διέγραψε συνεδρία",
+                    "marked paid": "σήμανε ως πληρωμένο",
+                    "closed session": "έκλεισε συνεδρία",
+                    "acknowledged call": "επιβεβαίωσε κλήση",
+                    "approved order": "ενέκρινε παραγγελία",
+                    "rejected order": "απέρριψε παραγγελία",
+                    "deleted order": "διέγραψε παραγγελία",
+                    "added menu item": "πρόσθεσε προϊόν μενού",
+                    "updated menu item": "ενημέρωσε προϊόν μενού",
+                    "deleted menu item": "διέγραψε προϊόν μενού"
+                }
+            },
+            en: {
+                login_title: "Staff Login",
+                login_sub: "Enter the staff code and your name once — this device will remember them.",
+                name_placeholder: "Your name",
+                code_placeholder: "Staff code",
+                unlock: "Unlock",
+                enter_name: "Please enter your name.",
+                wrong_code: "Incorrect code, try again.",
+                waiter_title: "Katina — Waiter",
+                logged_in_as: (n) => `Logged in as ${n}`,
+                notifications: "🔔 Notifications",
+                activity_log: "📋 Activity Log",
+                history_for: (l) => `🕘 ${l} — History`,
+                no_history: "No history for this table yet.",
+                no_activity: "No activity yet.",
+                no_alerts: "No active alerts 🎉",
+                tables: "Tables",
+                register_table: "Register Table",
+                empty: "🟢 Empty",
+                paid: "💰 Paid",
+                unpaid: "❌ Unpaid",
+                people: (n) => `👥 ${n}`,
+                pending_short: (n) => `🧾 ${n} pending`,
+                calling_waiter: "🔔 CALLING WAITER",
+                wants_to_pay: (m) => `💳 WANTS TO PAY${m ? " — " + m : ""}`,
+                new_orders: (n) => `🧾 ${n} NEW ORDER${n > 1 ? "S" : ""}`,
+                needs_release: "⏹️ NEEDS RELEASE",
+                session_status: (s) => `Session ${s}`,
+                cash: "💵 Cash",
+                card: "💳 Card",
+                called_for_waiter: "Called for a waiter",
+                requested_bill: (m) => `Requested the bill${m ? " (" + m + ")" : ""}`,
+                orders_awaiting: (n) => `${n} order(s) awaiting review`,
+                needs_release_short: "Needs release",
+                table_empty_msg: "🟢 This table is currently empty.",
+                party_size_placeholder: "party size",
+                open_session: "Open Session",
+                delete_table: "Delete Table",
+                session_ended_msg: (s) => `⏹️ This session has ended (${s}), but the table hasn't been released yet.`,
+                release_table: "Release Table",
+                edit: "✏️ Edit",
+                bill_so_far: (a) => `💶 Bill so far: €${a}`,
+                customer_link: "Customer link ↗",
+                table_called_msg: "🔔 This table called for a waiter.",
+                acknowledge: "Acknowledge",
+                table_requested_bill_msg: (m) => `💳 This table requested the bill${m ? " — " + m : ""}.`,
+                orders_heading: "Orders",
+                no_orders: "No orders yet.",
+                accept: "Accept",
+                reject: "Reject",
+                by: (n) => `by ${n}`,
+                calculate_split: "Calculate Split",
+                mark_paid: "Mark Paid",
+                close_session: "Close Session",
+                delete_session: "Delete Session",
+                status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
+                register_table_title: "Register a New Table",
+                register_table_sub: "One-time setup — this table stays forever, sessions come and go on top of it.",
+                table_id_placeholder: "table id (e.g. T-1)",
+                table_label_placeholder: "display name (optional)",
+                rename_prompt: "Rename table:",
+                party_size_prompt: "Update party size:",
+                delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
+                delete_session_confirm: "Delete this session? This cancels all its orders.",
+                split_result: (t, p, n) => `Total: €${t} — €${p} per person (${n} people)`,
+                session_closed_msg: "Session closed. You can release the table now.",
+                enter_table_id: "Enter a table id",
+                action_labels: {}
+            }
+        };
+
+        function t(key, ...args) {
+            const val = T[currentLang][key];
+            return typeof val === "function" ? val(...args) : val;
+        }
+
+        function toggleLang() {
+            currentLang = currentLang === "gr" ? "en" : "gr";
+            localStorage.setItem("katinaLang", currentLang);
+            applyStaticText();
+            if (getToken()) {
+                loadTables();
+                if (currentTableId) openTableModal(currentTableId, true);
+            }
+        }
+
+        function applyStaticText() {
+            const langLabel = currentLang === "gr" ? "EN" : "GR";
+            document.getElementById("loginLangBtn").innerText = langLabel;
+            document.getElementById("langBtn").innerText = langLabel;
+            document.getElementById("loginTitle").innerText = t("login_title");
+            document.getElementById("loginSub").innerText = t("login_sub");
+            document.getElementById("nameInput").placeholder = t("name_placeholder");
+            document.getElementById("loginInput").placeholder = t("code_placeholder");
+            document.getElementById("unlockBtn").innerText = t("unlock");
+            document.getElementById("headerTitle").innerText = t("waiter_title");
+            document.getElementById("tablesTitle").innerText = t("tables");
+            if (getWaiterName() !== "Unknown" || getToken()) {
+                document.getElementById("whoamiLabel").innerText = t("logged_in_as", getWaiterName());
+            }
+        }
 
         function playNotificationSound() {
             try {
@@ -461,7 +659,7 @@
 
         function showToast(alert) {
             const container = document.getElementById("toastContainer");
-            const toastClass = alert.text.includes("waiter") ? "called" : alert.text.includes("bill") ? "pay" : "";
+            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : "";
             const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : "🧾";
 
             const toast = document.createElement("div");
@@ -493,7 +691,7 @@
             const name = document.getElementById("nameInput").value.trim();
             const code = document.getElementById("loginInput").value;
             if (!name) {
-                document.getElementById("loginError").innerText = "Please enter your name.";
+                document.getElementById("loginError").innerText = t("enter_name");
                 return;
             }
             if (!code) return;
@@ -503,7 +701,7 @@
                 headers: { "X-Waiter-Token": code }
             }).then(r => {
                 if (r.status === 401) {
-                    document.getElementById("loginError").innerText = "Incorrect code, try again.";
+                    document.getElementById("loginError").innerText = t("wrong_code");
                     return null;
                 }
                 return r.json();
@@ -512,7 +710,7 @@
                 localStorage.setItem("waiterToken", code);
                 localStorage.setItem("waiterName", name);
                 document.getElementById("loginScreen").style.display = "none";
-                document.getElementById("whoamiLabel").innerText = "Logged in as " + name;
+                document.getElementById("whoamiLabel").innerText = t("logged_in_as", name);
                 loadTables();
             });
         }
@@ -535,16 +733,20 @@
         }
 
         function paymentMethodLabel(method) {
-            if (method === "cash") return "💵 Cash";
-            if (method === "card") return "💳 Card";
+            if (method === "cash") return t("cash");
+            if (method === "card") return t("card");
             return "";
         }
 
+        function translateAction(action) {
+            return T[currentLang].action_labels[action] || action;
+        }
+
         function openActivityLog() {
-            document.getElementById("logDrawerTitle").innerText = "📋 Activity Log";
+            document.getElementById("logDrawerTitle").innerText = t("activity_log");
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
-            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div>Loading...</div>`;
+            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div></div>`;
 
             fetch(`${BASE}/activity-log`, { headers: authHeaders() })
                 .then(r => r.json())
@@ -552,20 +754,20 @@
         }
 
         function openTableHistory(tableId, label) {
-            document.getElementById("logDrawerTitle").innerText = `🕘 ${label} — History`;
+            document.getElementById("logDrawerTitle").innerText = t("history_for", label);
             document.getElementById("drawerOverlay").classList.add("open");
             document.getElementById("logDrawer").classList.add("open");
-            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div>Loading...</div>`;
+            document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div></div>`;
 
             fetch(`${BASE}/tables/${tableId}/history`, { headers: authHeaders() })
                 .then(r => r.json())
-                .then(logs => renderLogList(logs, "No history for this table yet."));
+                .then(logs => renderLogList(logs, t("no_history")));
         }
 
         function renderLogList(logs, emptyMessage) {
             const list = document.getElementById("logList");
             if (!Array.isArray(logs) || logs.length === 0) {
-                list.innerHTML = `<div class="notif-empty">${emptyMessage || "No activity yet."}</div>`;
+                list.innerHTML = `<div class="notif-empty">${emptyMessage || t("no_activity")}</div>`;
                 return;
             }
             list.innerHTML = logs.map(l => {
@@ -573,7 +775,7 @@
                 return `
                     <div class="log-row">
                         <div class="waiter">${escapeHtml(l.waiter_name)}</div>
-                        <div class="action">${escapeHtml(l.action)} — ${escapeHtml(l.target_id)}</div>
+                        <div class="action">${escapeHtml(translateAction(l.action))} — ${escapeHtml(l.target_id)}</div>
                         <div class="time">${time}</div>
                     </div>
                 `;
@@ -590,12 +792,12 @@
         function openAddTableModal() {
             currentTableId = null;
             document.getElementById("modalContent").innerHTML = `
-                <h2>Register a New Table</h2>
-                <p style="color:#777; margin:8px 0 16px; font-size:14px;">One-time setup — this table stays forever, sessions come and go on top of it.</p>
-                <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
-                <input type="text" id="newTableLabel" placeholder="display name (optional)">
+                <h2>${t("register_table_title")}</h2>
+                <p style="color:#777; margin:8px 0 16px; font-size:14px;">${t("register_table_sub")}</p>
+                <input type="text" id="newTableId" placeholder="${t("table_id_placeholder")}">
+                <input type="text" id="newTableLabel" placeholder="${t("table_label_placeholder")}">
                 <div style="margin-top:16px;">
-                    <button class="primary" onclick="registerTable()">Register Table</button>
+                    <button class="primary" onclick="registerTable()">${t("register_table")}</button>
                 </div>
                 <p id="modalResult"></p>
             `;
@@ -605,7 +807,7 @@
         function registerTable() {
             const tableId = document.getElementById("newTableId").value;
             const label = document.getElementById("newTableLabel").value;
-            if (!tableId) return alert("Enter a table id");
+            if (!tableId) return alert(t("enter_table_id"));
 
             fetch(`${BASE}/tables?table_id=${tableId}&display_label=${label || tableId}`, {
                 method: "POST",
@@ -628,6 +830,7 @@
             const btn = document.getElementById("bellBtn");
             const isOpen = drawer.classList.contains("open");
 
+            document.getElementById("notifDrawerTitle").innerText = t("notifications");
             document.getElementById("logDrawer").classList.remove("open");
             drawer.classList.toggle("open", !isOpen);
             overlay.classList.toggle("open", !isOpen);
@@ -638,7 +841,7 @@
         function renderNotifPanel() {
             const list = document.getElementById("notifList");
             if (currentAlerts.length === 0) {
-                list.innerHTML = `<div class="notif-empty">No active alerts 🎉</div>`;
+                list.innerHTML = `<div class="notif-empty">${t("no_alerts")}</div>`;
                 return;
             }
             list.innerHTML = currentAlerts.map(a => `
@@ -689,23 +892,23 @@
                     grid.innerHTML = `
                         <div class="add-tile" onclick="openAddTableModal()">
                             <div class="plus">+</div>
-                            <div class="label">Register Table</div>
+                            <div class="label">${t("register_table")}</div>
                         </div>
                     `;
 
-                    tables.forEach(t => {
-                        const label = t.display_label || t.table_id;
+                    tables.forEach(tbl => {
+                        const label = tbl.display_label || tbl.table_id;
                         const safeLabel = escapeHtml(label);
-                        const session = sessionByTableId[t.table_id];
-                        const historyIcon = `<span class="history-icon" onclick="event.stopPropagation(); openTableHistory('${t.table_id}', '${safeLabel}')">🕘</span>`;
+                        const session = sessionByTableId[tbl.table_id];
+                        const historyIcon = `<span class="history-icon" onclick="event.stopPropagation(); openTableHistory('${tbl.table_id}', '${safeLabel}')">🕘</span>`;
 
                         if (!session) {
                             grid.innerHTML += `
-                                <div class="card empty" onclick="openTableModal('${t.table_id}')">
+                                <div class="card empty" onclick="openTableModal('${tbl.table_id}')">
                                     ${historyIcon}
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
-                                        <div class="card-stats"><span class="stat empty-stat">🟢 Empty</span></div>
+                                        <div class="card-stats"><span class="stat empty-stat">${t("empty")}</span></div>
                                     </div>
                                 </div>
                             `;
@@ -713,14 +916,14 @@
                         }
 
                         if (session.status !== "OPEN") {
-                            currentAlerts.push({ tableId: t.table_id, label, text: "Needs release" });
+                            currentAlerts.push({ tableId: tbl.table_id, label, text: t("needs_release_short"), type: "release" });
                             grid.innerHTML += `
-                                <div class="card has-alert" onclick="openTableModal('${t.table_id}')">
+                                <div class="card has-alert" onclick="openTableModal('${tbl.table_id}')">
                                     ${historyIcon}
-                                    <div class="card-alert release">⏹️ NEEDS RELEASE</div>
+                                    <div class="card-alert release">${t("needs_release")}</div>
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
-                                        <div class="card-stats"><span class="stat">Session ${session.status.toLowerCase()}</span></div>
+                                        <div class="card-stats"><span class="stat">${t("session_status", session.status)}</span></div>
                                     </div>
                                 </div>
                             `;
@@ -732,17 +935,17 @@
                         let bannerClass = "";
                         let bannerText = "";
                         if (session.waiter_called) {
-                            bannerClass = "called"; bannerText = "🔔 CALLING WAITER";
-                            currentAlerts.push({ tableId: t.table_id, label, text: "Called for a waiter" });
+                            bannerClass = "called"; bannerText = t("calling_waiter");
+                            currentAlerts.push({ tableId: tbl.table_id, label, text: t("called_for_waiter"), type: "called" });
                         } else if (session.payment_requested) {
                             const methodLabel = paymentMethodLabel(session.payment_method);
-                            bannerClass = "pay"; bannerText = `💳 WANTS TO PAY${methodLabel ? " — " + methodLabel : ""}`;
-                            currentAlerts.push({ tableId: t.table_id, label, text: `Requested the bill${methodLabel ? " (" + methodLabel + ")" : ""}` });
+                            bannerClass = "pay"; bannerText = t("wants_to_pay", methodLabel);
+                            currentAlerts.push({ tableId: tbl.table_id, label, text: t("requested_bill", methodLabel), type: "pay" });
                         } else if (pending > 0) {
-                            bannerClass = "pending"; bannerText = `🧾 ${pending} NEW ORDER${pending > 1 ? "S" : ""}`;
+                            bannerClass = "pending"; bannerText = t("new_orders", pending);
                         }
                         if (pending > 0 && bannerClass !== "pending") {
-                            currentAlerts.push({ tableId: t.table_id, label, text: `${pending} order(s) awaiting review` });
+                            currentAlerts.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
                         }
 
                         const bannerHtml = bannerClass
@@ -750,30 +953,29 @@
                             : "";
 
                         grid.innerHTML += `
-                            <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${t.table_id}')">
+                            <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${tbl.table_id}')">
                                 ${historyIcon}
                                 ${bannerHtml}
                                 <div class="card-body">
                                     <h3>${safeLabel}</h3>
                                     <div class="card-stats">
-                                        <span class="stat">👥 ${session.party_size}</span>
-                                        <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? "💰 Paid" : "❌ Unpaid"}</span>
-                                        ${pending > 0 && bannerClass !== "pending" ? `<span class="stat">🧾 ${pending} pending</span>` : ""}
+                                        <span class="stat">${t("people", session.party_size)}</span>
+                                        <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? t("paid") : t("unpaid")}</span>
+                                        ${pending > 0 && bannerClass !== "pending" ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
                                     </div>
                                 </div>
                             </div>
                         `;
                     });
 
-                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.text}`));
-                    const newAlerts = currentAlerts.filter(a => !previousAlertKeys.has(`${a.tableId}-${a.text}`));
+                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
+                    const newAlerts = currentAlerts.filter(a => !previousAlertKeys.has(`${a.tableId}-${a.type}`));
 
                     if (newAlerts.length > 0 && previousAlertKeys.size > 0) {
                         playNotificationSound();
                         newAlerts.forEach(a => showToast(a));
                     }
                     previousAlertKeys = currentAlertKeys;
-                    isFirstLoad = false;
 
                     document.getElementById("bellCount").innerText = currentAlerts.length;
                     if (document.getElementById("notifDrawer").classList.contains("open")) renderNotifPanel();
@@ -788,7 +990,7 @@
             const content = document.getElementById("modalContent");
 
             if (!silent) {
-                content.innerHTML = `<div class="loading-block"><div class="spinner"></div>Loading...</div>`;
+                content.innerHTML = `<div class="loading-block"><div class="spinner"></div></div>`;
                 document.getElementById("overlay").style.display = "flex";
             }
 
@@ -803,11 +1005,11 @@
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
                             <h2>${safeLabel}${renameIcon}</h2>
-                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">🟢 This table is currently empty.</p>
-                            <input type="number" id="quickPartySize" placeholder="party size" value="2" style="width:120px;">
+                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">${t("table_empty_msg")}</p>
+                            <input type="number" id="quickPartySize" placeholder="${t("party_size_placeholder")}" value="2" style="width:120px;">
                             <div style="margin-top:12px;">
-                                <button class="success" onclick="openSessionForCurrentTable()">Open Session</button>
-                                <button class="danger" onclick="deleteTable('${tableId}')">Delete Table</button>
+                                <button class="success" onclick="openSessionForCurrentTable()">${t("open_session")}</button>
+                                <button class="danger" onclick="deleteTable('${tableId}')">${t("delete_table")}</button>
                             </div>
                             <p id="modalResult"></p>
                         `;
@@ -820,8 +1022,8 @@
                             if (session.error || session.status !== "OPEN") {
                                 content.innerHTML = `
                                     <h2>${safeLabel}${renameIcon}</h2>
-                                    <p style="color:#777; font-weight:600; margin:12px 0;">⏹️ This session has ended (${session.status || "unknown"}), but the table hasn't been released yet.</p>
-                                    <button class="secondary" onclick="releaseTable('${tableId}')">Release Table</button>
+                                    <p style="color:#777; font-weight:600; margin:12px 0;">${t("session_ended_msg", session.status || "unknown")}</p>
+                                    <button class="secondary" onclick="releaseTable('${tableId}')">${t("release_table")}</button>
                                     <p id="modalResult"></p>
                                 `;
                                 return;
@@ -842,41 +1044,41 @@
                                                 <div class="info">${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}</div>
                                                 <div class="actions">
                                                     ${o.status === "PENDING_REVIEW" ? `
-                                                        <button class="success" onclick="approveOrder('${o.order_id}')">Accept</button>
-                                                        <button class="danger" onclick="rejectOrder('${o.order_id}')">Reject</button>
-                                                    ` : `<span style="font-size:12px;color:#999;">${o.status}${o.handled_by ? ' by ' + escapeHtml(o.handled_by) : ''}</span>`}
+                                                        <button class="success" onclick="approveOrder('${o.order_id}')">${t("accept")}</button>
+                                                        <button class="danger" onclick="rejectOrder('${o.order_id}')">${t("reject")}</button>
+                                                    ` : `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`}
                                                 </div>
                                             </div>
                                         `).join("")
-                                        : "<p style='color:#999; padding:10px 0;'>No orders yet.</p>";
+                                        : `<p style='color:#999; padding:10px 0;'>${t("no_orders")}</p>`;
 
                                     let alerts = "";
                                     if (session.waiter_called) {
-                                        alerts += `<p style="color:#f39c12; font-weight:700; margin:10px 0;">🔔 This table called for a waiter.
-                                            <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">Acknowledge</button></p>`;
+                                        alerts += `<p style="color:#f39c12; font-weight:700; margin:10px 0;">${t("table_called_msg")}
+                                            <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">${t("acknowledge")}</button></p>`;
                                     }
                                     if (session.payment_requested) {
                                         const methodLabel = paymentMethodLabel(session.payment_method);
-                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">💳 This table requested the bill${methodLabel ? " — " + methodLabel : ""}.</p>`;
+                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">${t("table_requested_bill_msg", methodLabel)}</p>`;
                                     }
 
                                     content.innerHTML = `
                                         <h2>${safeLabel}${renameIcon}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">
-                                            👥 ${session.party_size} people
-                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">✏️ Edit</span>
-                                            &nbsp;|&nbsp; ${session.is_paid ? "💰 Paid" : "❌ Unpaid"}
+                                            ${t("people", session.party_size)}
+                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit")}</span>
+                                            &nbsp;|&nbsp; ${session.is_paid ? t("paid") : t("unpaid")}
                                         </p>
-                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">💶 Bill so far: €${billTotal.toFixed(2)}</p>
-                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">Customer link ↗</a></p>
+                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
+                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
                                         ${alerts}
-                                        <h3 style="font-size:16px; margin:20px 0 10px;">Orders</h3>
+                                        <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
                                         ${ordersHtml}
                                         <div class="action-row">
-                                            <button class="secondary" onclick="calculateSplit('${session.session_id}')">Calculate Split</button>
-                                            <button class="success" onclick="markPaid('${session.session_id}')">Mark Paid</button>
-                                            <button onclick="closeSession('${session.session_id}')">Close Session</button>
-                                            <button class="danger" onclick="deleteSession('${session.session_id}')">Delete Session</button>
+                                            <button class="secondary" onclick="calculateSplit('${session.session_id}')">${t("calculate_split")}</button>
+                                            <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
+                                            <button onclick="closeSession('${session.session_id}')">${t("close_session")}</button>
+                                            <button class="danger" onclick="deleteSession('${session.session_id}')">${t("delete_session")}</button>
                                         </div>
                                         <p id="modalResult"></p>
                                     `;
@@ -886,7 +1088,7 @@
         }
 
         function renameTable(tableId, currentLabel) {
-            const newLabel = prompt("Rename table:", currentLabel);
+            const newLabel = prompt(t("rename_prompt"), currentLabel);
             if (newLabel === null || !newLabel.trim()) return;
 
             fetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
@@ -905,7 +1107,7 @@
         }
 
         function editPartySize(sessionId, currentSize) {
-            const newSize = prompt("Update party size:", currentSize);
+            const newSize = prompt(t("party_size_prompt"), currentSize);
             if (newSize === null) return;
 
             fetch(`${BASE}/sessions/${sessionId}/update-party-size?party_size=${newSize}`, {
@@ -942,7 +1144,7 @@
         }
 
         function deleteTable(tableId) {
-            if (!confirm(`Permanently delete table "${tableId}"? This cannot be undone.`)) return;
+            if (!confirm(t("delete_table_confirm", tableId))) return;
             fetch(`${BASE}/tables/${tableId}`, {
                 method: "DELETE",
                 headers: authHeaders()
@@ -999,8 +1201,7 @@
             fetch(`${BASE}/sessions/${sessionId}/split`, { method: "POST" })
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById("modalResult").innerText =
-                        `Total: €${data.total} — €${data.per_person} per person (${data.party_size} people)`;
+                    document.getElementById("modalResult").innerText = t("split_result", data.total, data.per_person, data.party_size);
                 });
         }
 
@@ -1020,14 +1221,14 @@
             })
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById("modalResult").innerText = data.error || "Session closed. You can release the table now.";
+                    document.getElementById("modalResult").innerText = data.error || t("session_closed_msg");
                     openTableModal(currentTableId);
                     loadTables();
                 });
         }
 
         function deleteSession(sessionId) {
-            if (!confirm("Delete this session? This cancels all its orders.")) return;
+            if (!confirm(t("delete_session_confirm"))) return;
             fetch(`${BASE}/sessions/${sessionId}`, {
                 method: "DELETE",
                 headers: authHeaders()
@@ -1052,9 +1253,11 @@
                 });
         }
 
+        applyStaticText();
+
         if (getToken()) {
             document.getElementById("loginScreen").style.display = "none";
-            document.getElementById("whoamiLabel").innerText = "Logged in as " + getWaiterName();
+            document.getElementById("whoamiLabel").innerText = t("logged_in_as", getWaiterName());
             loadTables();
         }
         setInterval(loadTables, 5000);
