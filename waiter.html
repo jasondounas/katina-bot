@@ -472,11 +472,11 @@
                 needs_release_short: "Χρειάζεται απελευθέρωση",
                 table_empty_msg: "🟢 Αυτό το τραπέζι είναι άδειο αυτή τη στιγμή.",
                 party_size_placeholder: "αριθμός ατόμων",
-                open_session: "Άνοιγμα Συνεδρίας",
+                open_session: "Άνοιγμα Τραπεζιού",
                 session_ended_msg: (s) => `⏹️ Αυτή η συνεδρία έχει τελειώσει (${s}), αλλά το τραπέζι δεν έχει απελευθερωθεί ακόμα.`,
                 release_table: "Απελευθέρωση Τραπεζιού",
                 edit: "✏️ Επεξεργασία",
-                bill_so_far: (a) => `💶 Λογαριασμός μέχρι τώρα: €${a}`,
+                bill_so_far: (a) => `💶 Λογαριασμός: €${a}`,
                 customer_link: "Σύνδεσμος πελάτη ↗",
                 table_called_msg: "🔔 Αυτό το τραπέζι κάλεσε σερβιτόρο.",
                 acknowledge: "Επιβεβαίωση",
@@ -486,14 +486,12 @@
                 accept: "Αποδοχή",
                 reject: "Απόρριψη",
                 by: (n) => `από ${n}`,
-                calculate_split: "Υπολογισμός Μοιράσματος",
-                mark_paid: "Σήμανση ως Πληρωμένο",
-                delete_session: "Διαγραφή Συνεδρίας",
+                mark_paid: "Πληρωμένο",
+                delete_session: "Διαγραφή",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
                 delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
-                split_result: (t, p, n) => `Σύνολο: €${t} — €${p} ανά άτομο (${n} άτομα)`,
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -503,7 +501,6 @@
                     "updated party size": "ενημέρωσε αριθμό ατόμων",
                     "deleted session": "διέγραψε συνεδρία",
                     "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
-                    "closed session": "έκλεισε συνεδρία",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
                     "rejected order": "απέρριψε παραγγελία",
@@ -562,14 +559,12 @@
                 accept: "Accept",
                 reject: "Reject",
                 by: (n) => `by ${n}`,
-                calculate_split: "Calculate Split",
                 mark_paid: "Mark Paid",
-                delete_session: "Delete Session",
+                delete_session: "Delete",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
                 delete_session_confirm: "Delete this session? This cancels all its orders.",
-                split_result: (t, p, n) => `Total: €${t} — €${p} per person (${n} people)`,
                 action_labels: {}
             }
         };
@@ -1003,7 +998,6 @@
                                         <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
                                         ${ordersHtml}
                                         <div class="action-row">
-                                            <button class="secondary" onclick="calculateSplit('${session.session_id}')">${t("calculate_split")}</button>
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
                                             <button class="danger" onclick="deleteSession('${session.session_id}')">${t("delete_session")}</button>
                                         </div>
@@ -1105,14 +1099,6 @@
             })
                 .then(r => r.json())
                 .then(() => { openTableModal(currentTableId); loadTables(); });
-        }
-
-        function calculateSplit(sessionId) {
-            fetch(`${BASE}/sessions/${sessionId}/split`, { method: "POST" })
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById("modalResult").innerText = t("split_result", data.total, data.per_person, data.party_size);
-                });
         }
 
         function markPaid(sessionId) {
