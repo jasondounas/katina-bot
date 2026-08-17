@@ -675,16 +675,17 @@ def mark_paid(session_id: str, _auth: None = Depends(verify_waiter), waiter_name
         return {"error": "Session not found"}
 
     cur.execute(
-        "UPDATE sessions SET is_paid = 1, payment_requested = 0 WHERE session_id = %s",
+        "UPDATE sessions SET is_paid = 1, payment_requested = 0, status = 'CLOSED' WHERE session_id = %s",
         (session_id,),
     )
+    cur.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = %s", (session["table_id"],))
     conn.commit()
     cur.close()
     conn.close()
 
-    log_action(waiter_name, "marked paid", session_id)
+    log_action(waiter_name, "marked paid and released table", session_id)
 
-    return {"session_id": session_id, "is_paid": True}
+    return {"session_id": session_id, "is_paid": True, "released": True}
 
 
 @app.post("/sessions/{session_id}/close")
