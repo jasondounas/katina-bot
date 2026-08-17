@@ -27,6 +27,16 @@
             grid-column: 1 / -1;
         }
 
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .form-row input, .form-row textarea, .form-row select {
+            margin: 0;
+        }
+
         textarea {
             font-family: inherit;
             resize: none;
@@ -38,13 +48,8 @@
             border: 1.5px solid #eee;
             border-radius: 10px;
             font-size: 14px;
-            margin: 6px 6px 6px 0;
             width: 220px;
             min-height: 40px;
-        }
-        .add-form input,
-        .add-form textarea {
-            vertical-align: top;
         }
         .edit-modal textarea {
             width: 100%;
@@ -226,7 +231,6 @@
             border-radius: 10px;
             font-size: 14px;
             background: white;
-            margin: 6px 6px 6px 0;
         }
         .edit-modal select { width: 100%; margin-bottom: 10px; }
 
@@ -315,7 +319,6 @@
             border: 1.5px solid #eee;
             border-radius: 10px;
             font-size: 14px;
-            margin: 6px 6px 6px 0;
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
@@ -405,9 +408,11 @@
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="tablesTitle">Tables</span></span></div>
 
         <div class="add-form">
-            <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
-            <input type="text" id="newTableLabel" placeholder="display name (optional)">
-            <button class="primary" id="addTableBtn" onclick="addTable()">+ Register Table</button>
+            <div class="form-row">
+                <input type="text" id="newTableId" placeholder="table id (e.g. T-1)">
+                <input type="text" id="newTableLabel" placeholder="display name (optional)">
+            </div>
+            <button class="primary" id="addTableBtn" onclick="addTable()" style="margin-top:10px;">+ Register Table</button>
             <p id="addTableResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
 
@@ -422,23 +427,25 @@
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="menuItemsTitle">Menu Items</span></span></div>
 
         <div class="add-form">
-            <input type="text" id="itemId" placeholder="id (e.g. fries)">
-            <input type="text" id="itemName" placeholder="Name">
-            <input type="number" id="itemPrice" placeholder="Price" step="0.01">
-            <textarea id="itemDesc" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
-            <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
-            <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
+            <div class="form-row">
+                <input type="text" id="itemId" placeholder="id (e.g. fries)">
+                <input type="text" id="itemName" placeholder="Name">
+                <input type="number" id="itemPrice" placeholder="Price" step="0.01">
+                <textarea id="itemDesc" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
+                <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
+                <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
+            </div>
 
             <div class="image-source-toggle">
                 <button type="button" id="addSourceUrl" class="active" onclick="setAddImageSource('url')">Image URL</button>
                 <button type="button" id="addSourceFile" onclick="setAddImageSource('file')">Upload Photo</button>
             </div>
-            <input type="text" id="itemImageUrl" placeholder="Image URL (optional)">
+            <input type="text" id="itemImageUrl" placeholder="Image URL (optional)" style="margin-bottom:8px;">
             <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleAddImageFile(this)">
             <img class="image-preview" id="addImagePreview">
 
             <br>
-            <button class="primary" id="addItemBtn" onclick="addItem()">+ Add Item</button>
+            <button class="primary" id="addItemBtn" onclick="addItem()" style="margin-top:10px;">+ Add Item</button>
             <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
 
