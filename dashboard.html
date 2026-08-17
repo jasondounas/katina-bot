@@ -72,6 +72,12 @@
             cursor: pointer;
         }
         .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+        .login-lang-toggle {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(255,255,255,0.1); color: white; border: none;
+            padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
+            cursor: pointer;
+        }
 
         header {
             background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
@@ -92,6 +98,16 @@
         }
         header h1 { font-size: 20px; font-weight: 800; }
         header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
+        .lang-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
 
         .container { padding: 24px; max-width: 900px; margin: 0 auto; }
 
@@ -308,13 +324,14 @@
 <body>
 
     <div class="login-screen" id="loginScreen">
+        <button class="login-lang-toggle" onclick="toggleLang()" id="loginLangBtn">EN</button>
         <div class="login-box">
             <div class="logo">🍽️</div>
-            <h2>Staff Login</h2>
-            <p>Enter the staff code and your name once — this device will remember them.</p>
+            <h2 id="loginTitle">Staff Login</h2>
+            <p id="loginSub">Enter the staff code and your name once — this device will remember them.</p>
             <input type="text" id="nameInput" placeholder="Your name">
             <input type="password" id="loginInput" placeholder="Staff code" onkeydown="if(event.key==='Enter') doLogin()">
-            <button onclick="doLogin()">Unlock</button>
+            <button onclick="doLogin()" id="unlockBtn">Unlock</button>
             <div class="login-error" id="loginError"></div>
         </div>
     </div>
@@ -323,28 +340,29 @@
         <div class="brand">
             <div class="logo">🍽️</div>
             <div>
-                <h1>Katina — Dashboard</h1>
+                <h1 id="headerTitle">Katina — Dashboard</h1>
                 <div class="whoami" id="whoamiLabel"></div>
             </div>
         </div>
+        <button class="lang-btn" onclick="toggleLang()" id="langBtn">EN</button>
     </header>
 
     <div class="container">
 
         <div class="stats-row" id="statsRow">
-            <div class="loading-block"><div class="spinner"></div>Loading stats...</div>
+            <div class="loading-block"><div class="spinner"></div></div>
         </div>
 
-        <div class="section-title"><span><span class="bar"></span>Live Alerts</span></div>
-        <div id="alertsList"><div class="loading-block"><div class="spinner"></div>Loading...</div></div>
+        <div class="section-title"><span><span class="bar"></span><span id="liveAlertsTitle">Live Alerts</span></span></div>
+        <div id="alertsList"><div class="loading-block"><div class="spinner"></div></div></div>
 
         <div class="collapsible-header section-title" style="margin-top:32px;" id="activityHeader" onclick="toggleActivity()">
-            <span><span class="bar"></span>Recent Activity</span>
+            <span><span class="bar"></span><span id="recentActivityTitle">Recent Activity</span></span>
             <span class="chevron">▼</span>
         </div>
         <div class="collapsible-body" id="activityList"></div>
 
-        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span>Menu Items</span></div>
+        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="menuItemsTitle">Menu Items</span></span></div>
 
         <div class="add-form">
             <input type="text" id="itemId" placeholder="id (e.g. fries)">
@@ -367,23 +385,23 @@
             <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
 
-        <div id="menuItemsList"><div class="loading-block"><div class="spinner"></div>Loading menu...</div></div>
+        <div id="menuItemsList"><div class="loading-block"><div class="spinner"></div></div></div>
     </div>
 
     <div class="modal-overlay" id="editOverlay">
         <div class="edit-modal">
-            <h3>Edit Item</h3>
-            <label>Name</label>
+            <h3 id="editTitle">Edit Item</h3>
+            <label id="editNameLabel">Name</label>
             <input type="text" id="editName">
-            <label>Price</label>
+            <label id="editPriceLabel">Price</label>
             <input type="number" id="editPrice" step="0.01">
-            <label>Description</label>
+            <label id="editDescLabel">Description</label>
             <input type="text" id="editDesc">
-            <label>Category</label>
+            <label id="editCategoryLabel">Category</label>
             <select id="editCategory" onchange="handleCategorySelectChange('edit')"></select>
             <input type="text" id="editCategoryNew" placeholder="New category name" style="display:none; margin-top:8px;">
 
-            <label style="margin-top:10px;">Image</label>
+            <label id="editImageLabel" style="margin-top:10px;">Image</label>
             <div class="image-source-toggle">
                 <button type="button" id="editSourceUrl" class="active" onclick="setEditImageSource('url')">Image URL</button>
                 <button type="button" id="editSourceFile" onclick="setEditImageSource('file')">Upload Photo</button>
@@ -394,7 +412,7 @@
 
             <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="primary" id="saveEditBtn" onclick="saveEdit()">Save</button>
-                <button class="secondary" onclick="closeEdit()">Cancel</button>
+                <button class="secondary" onclick="closeEdit()" id="cancelEditBtn">Cancel</button>
             </div>
             <p id="editResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
         </div>
@@ -407,15 +425,203 @@
         let addImageData = "";
         let editImageData = "";
 
-        const CATEGORY_LABELS = {
-            drinks: "🥤 Drinks",
-            salads: "🥗 Salads",
-            burgers: "🍔 Burgers",
-            other: "🍽️ Other"
+        let currentLang = localStorage.getItem("katinaLang") || "gr";
+
+        const T = {
+            gr: {
+                login_title: "Σύνδεση Προσωπικού",
+                login_sub: "Εισάγετε τον κωδικό προσωπικού και το όνομά σας μία φορά — αυτή η συσκευή θα τα θυμάται.",
+                name_placeholder: "Το όνομά σας",
+                code_placeholder: "Κωδικός προσωπικού",
+                unlock: "Ξεκλείδωμα",
+                enter_name: "Παρακαλώ εισάγετε το όνομά σας.",
+                wrong_code: "Λάθος κωδικός, δοκιμάστε ξανά.",
+                dashboard_title: "Katina — Πίνακας Ελέγχου",
+                logged_in_as: (n) => `Συνδεδεμένος ως ${n}`,
+                total_revenue: "Συνολικά Έσοδα",
+                currently_unpaid: "Απλήρωτο Τώρα",
+                total_tables: "Σύνολο Τραπεζιών",
+                occupied: "Κατειλημμένα",
+                open_sessions: "Ανοιχτές Συνεδρίες",
+                pending_orders: "Εκκρεμείς Παραγγελίες",
+                live_alerts: "Ζωντανές Ειδοποιήσεις",
+                recent_activity: "Πρόσφατη Δραστηριότητα",
+                menu_items: "Προϊόντα Μενού",
+                no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
+                no_activity: "Δεν υπάρχει δραστηριότητα ακόμα.",
+                no_items: "Δεν υπάρχουν προϊόντα μενού ακόμα.",
+                called_for_waiter: "🔔 Κάλεσε σερβιτόρο",
+                wants_to_pay: (m) => `💳 Θέλει να πληρώσει${m ? " — " + m : ""}`,
+                cash: "💵 Μετρητά",
+                card: "💳 Κάρτα",
+                id_placeholder: "id (π.χ. fries)",
+                name_field_placeholder: "Όνομα",
+                price_placeholder: "Τιμή",
+                desc_placeholder: "Περιγραφή",
+                new_category_placeholder: "Όνομα νέας κατηγορίας",
+                image_url_btn: "Σύνδεσμος Εικόνας",
+                upload_photo_btn: "Ανέβασμα Φωτογραφίας",
+                image_url_placeholder: "Σύνδεσμος εικόνας (προαιρετικό)",
+                add_item: "+ Προσθήκη Προϊόντος",
+                adding: "Προσθήκη...",
+                added: "Προστέθηκε!",
+                required_fields: "Το id, το όνομα και η τιμή είναι υποχρεωτικά.",
+                hide: "Απόκρυψη",
+                show: "Εμφάνιση",
+                edit: "Επεξεργασία",
+                delete: "Διαγραφή",
+                unavailable_suffix: "(μη διαθέσιμο)",
+                edit_item_title: "Επεξεργασία Προϊόντος",
+                name_label: "Όνομα",
+                price_label: "Τιμή",
+                desc_label: "Περιγραφή",
+                category_label: "Κατηγορία",
+                image_label: "Εικόνα",
+                save: "Αποθήκευση",
+                cancel: "Ακύρωση",
+                delete_confirm: (id) => `Οριστική διαγραφή "${id}";`,
+                new_category_option: "+ Νέα κατηγορία...",
+                category_labels: { drinks: "🥤 Ποτά", salads: "🥗 Σαλάτες", burgers: "🍔 Μπέργκερ", other: "🍽️ Άλλο" },
+                action_labels: {
+                    "registered table": "καταχώρησε τραπέζι",
+                    "deleted table": "διέγραψε τραπέζι",
+                    "released table": "απελευθέρωσε τραπέζι",
+                    "renamed table": "μετονόμασε τραπέζι",
+                    "opened session": "άνοιξε συνεδρία",
+                    "updated party size": "ενημέρωσε αριθμό ατόμων",
+                    "deleted session": "διέγραψε συνεδρία",
+                    "marked paid": "σήμανε ως πληρωμένο",
+                    "closed session": "έκλεισε συνεδρία",
+                    "acknowledged call": "επιβεβαίωσε κλήση",
+                    "approved order": "ενέκρινε παραγγελία",
+                    "rejected order": "απέρριψε παραγγελία",
+                    "deleted order": "διέγραψε παραγγελία",
+                    "added menu item": "πρόσθεσε προϊόν μενού",
+                    "updated menu item": "ενημέρωσε προϊόν μενού",
+                    "deleted menu item": "διέγραψε προϊόν μενού"
+                }
+            },
+            en: {
+                login_title: "Staff Login",
+                login_sub: "Enter the staff code and your name once — this device will remember them.",
+                name_placeholder: "Your name",
+                code_placeholder: "Staff code",
+                unlock: "Unlock",
+                enter_name: "Please enter your name.",
+                wrong_code: "Incorrect code, try again.",
+                dashboard_title: "Katina — Dashboard",
+                logged_in_as: (n) => `Logged in as ${n}`,
+                total_revenue: "Total Revenue",
+                currently_unpaid: "Currently Unpaid",
+                total_tables: "Total Tables",
+                occupied: "Occupied",
+                open_sessions: "Open Sessions",
+                pending_orders: "Pending Orders",
+                live_alerts: "Live Alerts",
+                recent_activity: "Recent Activity",
+                menu_items: "Menu Items",
+                no_alerts: "No active alerts 🎉",
+                no_activity: "No activity yet.",
+                no_items: "No menu items yet.",
+                called_for_waiter: "🔔 Called for a waiter",
+                wants_to_pay: (m) => `💳 Wants to pay${m ? " — " + m : ""}`,
+                cash: "💵 Cash",
+                card: "💳 Card",
+                id_placeholder: "id (e.g. fries)",
+                name_field_placeholder: "Name",
+                price_placeholder: "Price",
+                desc_placeholder: "Description",
+                new_category_placeholder: "New category name",
+                image_url_btn: "Image URL",
+                upload_photo_btn: "Upload Photo",
+                image_url_placeholder: "Image URL (optional)",
+                add_item: "+ Add Item",
+                adding: "Adding...",
+                added: "Added!",
+                required_fields: "Id, name and price are required.",
+                hide: "Hide",
+                show: "Show",
+                edit: "Edit",
+                delete: "Delete",
+                unavailable_suffix: "(unavailable)",
+                edit_item_title: "Edit Item",
+                name_label: "Name",
+                price_label: "Price",
+                desc_label: "Description",
+                category_label: "Category",
+                image_label: "Image",
+                save: "Save",
+                cancel: "Cancel",
+                delete_confirm: (id) => `Delete "${id}" permanently?`,
+                new_category_option: "+ New category...",
+                category_labels: { drinks: "🥤 Drinks", salads: "🥗 Salads", burgers: "🍔 Burgers", other: "🍽️ Other" },
+                action_labels: {}
+            }
         };
 
+        function t(key, ...args) {
+            const val = T[currentLang][key];
+            return typeof val === "function" ? val(...args) : val;
+        }
+
+        function toggleLang() {
+            currentLang = currentLang === "gr" ? "en" : "gr";
+            localStorage.setItem("katinaLang", currentLang);
+            applyStaticText();
+            if (getToken()) {
+                loadStats();
+                loadAlerts();
+                loadMenuItems();
+                if (activityLoaded) loadActivity();
+            }
+        }
+
+        function applyStaticText() {
+            const langLabel = currentLang === "gr" ? "EN" : "GR";
+            document.getElementById("loginLangBtn").innerText = langLabel;
+            document.getElementById("langBtn").innerText = langLabel;
+            document.getElementById("loginTitle").innerText = t("login_title");
+            document.getElementById("loginSub").innerText = t("login_sub");
+            document.getElementById("nameInput").placeholder = t("name_placeholder");
+            document.getElementById("loginInput").placeholder = t("code_placeholder");
+            document.getElementById("unlockBtn").innerText = t("unlock");
+            document.getElementById("headerTitle").innerText = t("dashboard_title");
+            document.getElementById("liveAlertsTitle").innerText = t("live_alerts");
+            document.getElementById("recentActivityTitle").innerText = t("recent_activity");
+            document.getElementById("menuItemsTitle").innerText = t("menu_items");
+            document.getElementById("itemId").placeholder = t("id_placeholder");
+            document.getElementById("itemName").placeholder = t("name_field_placeholder");
+            document.getElementById("itemPrice").placeholder = t("price_placeholder");
+            document.getElementById("itemDesc").placeholder = t("desc_placeholder");
+            document.getElementById("itemCategoryNew").placeholder = t("new_category_placeholder");
+            document.getElementById("addSourceUrl").innerText = t("image_url_btn");
+            document.getElementById("addSourceFile").innerText = t("upload_photo_btn");
+            document.getElementById("itemImageUrl").placeholder = t("image_url_placeholder");
+            document.getElementById("addItemBtn").innerHTML = t("add_item");
+            document.getElementById("editTitle").innerText = t("edit_item_title");
+            document.getElementById("editNameLabel").innerText = t("name_label");
+            document.getElementById("editPriceLabel").innerText = t("price_label");
+            document.getElementById("editDescLabel").innerText = t("desc_label");
+            document.getElementById("editCategoryLabel").innerText = t("category_label");
+            document.getElementById("editImageLabel").innerText = t("image_label");
+            document.getElementById("editCategoryNew").placeholder = t("new_category_placeholder");
+            document.getElementById("editSourceUrl").innerText = t("image_url_btn");
+            document.getElementById("editSourceFile").innerText = t("upload_photo_btn");
+            document.getElementById("editImageUrl").placeholder = t("image_url_placeholder");
+            document.getElementById("saveEditBtn").innerText = t("save");
+            document.getElementById("cancelEditBtn").innerText = t("cancel");
+            if (getWaiterName() !== "Unknown" || getToken()) {
+                document.getElementById("whoamiLabel").innerText = t("logged_in_as", getWaiterName());
+            }
+            populateCategoryDropdowns();
+        }
+
         function categoryLabel(cat) {
-            return CATEGORY_LABELS[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
+            return t("category_labels")[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
+        }
+
+        function translateAction(action) {
+            return T[currentLang].action_labels[action] || action;
         }
 
         function getToken() { return localStorage.getItem("waiterToken"); }
@@ -425,7 +631,7 @@
             const name = document.getElementById("nameInput").value.trim();
             const code = document.getElementById("loginInput").value;
             if (!name) {
-                document.getElementById("loginError").innerText = "Please enter your name.";
+                document.getElementById("loginError").innerText = t("enter_name");
                 return;
             }
             if (!code) return;
@@ -435,7 +641,7 @@
                 headers: { "X-Waiter-Token": code }
             }).then(r => {
                 if (r.status === 401) {
-                    document.getElementById("loginError").innerText = "Incorrect code, try again.";
+                    document.getElementById("loginError").innerText = t("wrong_code");
                     return null;
                 }
                 return r.json();
@@ -444,7 +650,7 @@
                 localStorage.setItem("waiterToken", code);
                 localStorage.setItem("waiterName", name);
                 document.getElementById("loginScreen").style.display = "none";
-                document.getElementById("whoamiLabel").innerText = "Logged in as " + name;
+                document.getElementById("whoamiLabel").innerText = t("logged_in_as", name);
                 init();
             });
         }
@@ -468,8 +674,8 @@
         }
 
         function paymentMethodLabel(method) {
-            if (method === "cash") return "💵 Cash";
-            if (method === "card") return "💳 Card";
+            if (method === "cash") return t("cash");
+            if (method === "card") return t("card");
             return "";
         }
 
@@ -535,10 +741,16 @@
         function populateCategoryDropdowns() {
             const categories = getKnownCategories();
             const optionsHtml = categories.map(c => `<option value="${c}">${categoryLabel(c)}</option>`).join("")
-                + `<option value="__new__">+ New category...</option>`;
+                + `<option value="__new__">${t("new_category_option")}</option>`;
 
-            document.getElementById("itemCategory").innerHTML = optionsHtml;
-            document.getElementById("editCategory").innerHTML = optionsHtml;
+            const itemSelect = document.getElementById("itemCategory");
+            const editSelect = document.getElementById("editCategory");
+            const itemPrev = itemSelect.value;
+            const editPrev = editSelect.value;
+            itemSelect.innerHTML = optionsHtml;
+            editSelect.innerHTML = optionsHtml;
+            if (itemPrev) itemSelect.value = itemPrev;
+            if (editPrev) editSelect.value = editPrev;
         }
 
         function handleCategorySelectChange(prefix) {
@@ -571,7 +783,7 @@
             body.classList.toggle("open", !isOpen);
 
             if (!isOpen && !activityLoaded) {
-                body.innerHTML = `<div class="loading-block"><div class="spinner"></div>Loading...</div>`;
+                body.innerHTML = `<div class="loading-block"><div class="spinner"></div></div>`;
                 loadActivity();
                 activityLoaded = true;
             }
@@ -586,12 +798,12 @@
             ]).then(([tables, pending, sessions, revenue]) => {
                 const occupied = tables.filter(t => t.active_session_id).length;
                 document.getElementById("statsRow").innerHTML = `
-                    <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">Total Revenue</div></div>
-                    <div class="stat-card money-outstanding"><div class="num">€${revenue.unpaid_amount.toFixed(2)}</div><div class="label">Currently Unpaid</div></div>
-                    <div class="stat-card"><div class="num">${tables.length}</div><div class="label">Total Tables</div></div>
-                    <div class="stat-card"><div class="num">${occupied}</div><div class="label">Occupied</div></div>
-                    <div class="stat-card"><div class="num">${sessions.length}</div><div class="label">Open Sessions</div></div>
-                    <div class="stat-card"><div class="num">${pending.length}</div><div class="label">Pending Orders</div></div>
+                    <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">${t("total_revenue")}</div></div>
+                    <div class="stat-card money-outstanding"><div class="num">€${revenue.unpaid_amount.toFixed(2)}</div><div class="label">${t("currently_unpaid")}</div></div>
+                    <div class="stat-card"><div class="num">${tables.length}</div><div class="label">${t("total_tables")}</div></div>
+                    <div class="stat-card"><div class="num">${occupied}</div><div class="label">${t("occupied")}</div></div>
+                    <div class="stat-card"><div class="num">${sessions.length}</div><div class="label">${t("open_sessions")}</div></div>
+                    <div class="stat-card"><div class="num">${pending.length}</div><div class="label">${t("pending_orders")}</div></div>
                 `;
             });
         }
@@ -605,15 +817,15 @@
                 sessions.forEach(s => { sessionByTableId[s.table_id] = s; });
 
                 let alertsHtml = "";
-                tables.forEach(t => {
-                    const s = sessionByTableId[t.table_id];
+                tables.forEach(tbl => {
+                    const s = sessionByTableId[tbl.table_id];
                     if (!s) return;
-                    const label = t.display_label || t.table_id;
+                    const label = tbl.display_label || tbl.table_id;
 
                     if (s.waiter_called) {
                         alertsHtml += `
                             <div class="alert-row called">
-                                <div><div class="table-name">${escapeHtml(label)}</div><div class="type">🔔 Called for a waiter</div></div>
+                                <div><div class="table-name">${escapeHtml(label)}</div><div class="type">${t("called_for_waiter")}</div></div>
                             </div>
                         `;
                     }
@@ -621,13 +833,13 @@
                         const methodLabel = paymentMethodLabel(s.payment_method);
                         alertsHtml += `
                             <div class="alert-row pay">
-                                <div><div class="table-name">${escapeHtml(label)}</div><div class="type">💳 Wants to pay${methodLabel ? " — " + methodLabel : ""}</div></div>
+                                <div><div class="table-name">${escapeHtml(label)}</div><div class="type">${t("wants_to_pay", methodLabel)}</div></div>
                             </div>
                         `;
                     }
                 });
 
-                document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">No active alerts 🎉</div>`;
+                document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">${t("no_alerts")}</div>`;
             });
         }
 
@@ -637,7 +849,7 @@
                 .then(logs => {
                     const list = document.getElementById("activityList");
                     if (!Array.isArray(logs) || logs.length === 0) {
-                        list.innerHTML = `<div class="alert-empty">No activity yet.</div>`;
+                        list.innerHTML = `<div class="alert-empty">${t("no_activity")}</div>`;
                         return;
                     }
                     list.innerHTML = logs.map(l => {
@@ -645,7 +857,7 @@
                         return `
                             <div class="activity-row">
                                 <div class="waiter">${escapeHtml(l.waiter_name)}</div>
-                                <div class="action">${escapeHtml(l.action)} — ${escapeHtml(l.target_id)}</div>
+                                <div class="action">${escapeHtml(translateAction(l.action))} — ${escapeHtml(l.target_id)}</div>
                                 <div class="time">${time}</div>
                             </div>
                         `;
@@ -662,7 +874,7 @@
                     populateCategoryDropdowns();
 
                     if (!items.length) {
-                        list.innerHTML = `<p style="color:#999;">No menu items yet.</p>`;
+                        list.innerHTML = `<p style="color:#999;">${t("no_items")}</p>`;
                         return;
                     }
 
@@ -680,14 +892,14 @@
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
                                 <div class="item-info">
-                                    <div class="name">${escapeHtml(item.name)} ${item.available ? '' : '(unavailable)'}</div>
+                                    <div class="name">${escapeHtml(item.name)} ${item.available ? '' : t("unavailable_suffix")}</div>
                                     <div class="price">€${Number(item.price).toFixed(2)}</div>
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
                                 </div>
                                 <div class="item-actions">
-                                    <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? 'Hide' : 'Show'}</button>
-                                    <button onclick="openEdit('${item.item_id}')">Edit</button>
-                                    <button class="danger" onclick="deleteItem('${item.item_id}')">Delete</button>
+                                    <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? t("hide") : t("show")}</button>
+                                    <button onclick="openEdit('${item.item_id}')">${t("edit")}</button>
+                                    <button class="danger" onclick="deleteItem('${item.item_id}')">${t("delete")}</button>
                                 </div>
                             </div>
                         `).join("");
@@ -707,14 +919,14 @@
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
 
             if (!id || !name || !price) {
-                document.getElementById("addResult").innerText = "Id, name and price are required.";
+                document.getElementById("addResult").innerText = t("required_fields");
                 return;
             }
 
             const btn = document.getElementById("addItemBtn");
-            const originalText = btn.innerHTML;
+            const originalText = t("add_item");
             btn.disabled = true;
-            btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;"></div>Adding...`;
+            btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;"></div>${t("adding")}`;
 
             fetch(`${BASE}/menu-items`, {
                 method: "POST",
@@ -739,7 +951,7 @@
                     document.getElementById("itemImageFile").value = "";
                     document.getElementById("addImagePreview").style.display = "none";
                     addImageData = "";
-                    document.getElementById("addResult").innerText = "Added!";
+                    document.getElementById("addResult").innerText = t("added");
                     loadMenuItems();
                 });
         }
@@ -753,7 +965,7 @@
         }
 
         function deleteItem(itemId) {
-            if (!confirm(`Delete "${itemId}" permanently?`)) return;
+            if (!confirm(t("delete_confirm", itemId))) return;
             fetch(`${BASE}/menu-items/${itemId}`, {
                 method: "DELETE",
                 headers: authHeaders()
@@ -797,7 +1009,7 @@
             if (image) payload.image = image;
 
             const btn = document.getElementById("saveEditBtn");
-            const originalText = btn.innerText;
+            const originalText = t("save");
             btn.disabled = true;
             btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;display:inline-block;"></div>`;
 
@@ -819,9 +1031,11 @@
                 });
         }
 
+        applyStaticText();
+
         if (getToken()) {
             document.getElementById("loginScreen").style.display = "none";
-            document.getElementById("whoamiLabel").innerText = "Logged in as " + getWaiterName();
+            document.getElementById("whoamiLabel").innerText = t("logged_in_as", getWaiterName());
             init();
         }
     </script>
