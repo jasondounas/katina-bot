@@ -258,15 +258,19 @@
             position: relative;
         }
         .card:hover { transform: translateY(-3px); }
-        .history-icon {
+        .icon-row {
             position: absolute;
             top: 10px; right: 10px;
-            font-size: 16px;
-            opacity: 0.5;
             z-index: 2;
+            display: flex;
+            gap: 8px;
+        }
+        .card-icon-btn {
+            font-size: 15px;
+            opacity: 0.55;
             cursor: pointer;
         }
-        .history-icon:hover { opacity: 1; }
+        .card-icon-btn:hover { opacity: 1; }
 
         .card-alert {
             padding: 10px 16px;
@@ -357,6 +361,19 @@
             cursor: pointer; font-size: 24px; color: #bbb;
         }
         #modalResult { margin-top: 14px; font-size: 13px; font-weight: 600; color: #555; }
+
+        .move-target-btn {
+            width: 100%;
+            text-align: left;
+            background: #f7f5f2;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .move-target-btn:hover { background: #ffe4cc; }
+        .move-empty-msg { color: #999; font-size: 14px; padding: 10px 0; }
     </style>
 </head>
 <body>
@@ -428,9 +445,17 @@
         </div>
     </div>
 
+    <div class="overlay" id="moveOverlay">
+        <div class="modal">
+            <span class="close-modal" onclick="closeMoveModal()">✕</span>
+            <div id="moveModalContent"></div>
+        </div>
+    </div>
+
     <script>
         const BASE = "https://katina-bot.onrender.com";
         let currentTableId = null;
+        let moveFromTableId = null;
         let currentAlerts = [];
         let previousAlertKeys = new Set();
 
@@ -488,6 +513,9 @@
                 by: (n) => `από ${n}`,
                 mark_paid: "Πληρωμένο",
                 delete_session: "Διαγραφή",
+                move_table: "Μετακίνηση",
+                move_title: (l) => `Μετακίνηση από ${l} σε:`,
+                move_no_empty: "Δεν υπάρχουν άδεια τραπέζια αυτή τη στιγμή.",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
@@ -507,7 +535,8 @@
                     "deleted order": "διέγραψε παραγγελία",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
-                    "deleted menu item": "διέγραψε προϊόν μενού"
+                    "deleted menu item": "διέγραψε προϊόν μενού",
+                    "moved table": "μετακίνησε τραπέζι"
                 }
             },
             en: {
@@ -561,6 +590,9 @@
                 by: (n) => `by ${n}`,
                 mark_paid: "Mark Paid",
                 delete_session: "Delete",
+                move_table: "Move",
+                move_title: (l) => `Move from ${l} to:`,
+                move_no_empty: "No empty tables right now.",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
@@ -791,6 +823,7 @@
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
             ]).then(([tables, pendingOrders]) => {
 
+                window._tablesCache = tables;
                 document.getElementById("tableCount").innerText = tables.length;
 
                 const pendingCountBySession = {};
@@ -824,12 +857,12 @@
                         const label = tbl.display_label || tbl.table_id;
                         const safeLabel = escapeHtml(label);
                         const session = sessionByTableId[tbl.table_id];
-                        const historyIcon = `<span class="history-icon" onclick="event.stopPropagation(); openTableHistory('${tbl.table_id}', '${safeLabel}')">🕘</span>`;
+                        const historyIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openTableHistory('${tbl.table_id}', '${safeLabel}')">🕘</span>`;
 
                         if (!session) {
                             grid.innerHTML += `
                                 <div class="card empty" onclick="openTableModal('${tbl.table_id}')">
-                                    ${historyIcon}
+                                    <div class="icon-row">${historyIcon}</div>
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
                                         <div class="card-stats"><span class="stat empty-stat">${t("empty")}</span></div>
@@ -843,7 +876,7 @@
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("needs_release_short"), type: "release" });
                             grid.innerHTML += `
                                 <div class="card has-alert" onclick="openTableModal('${tbl.table_id}')">
-                                    ${historyIcon}
+                                    <div class="icon-row">${historyIcon}</div>
                                     <div class="card-alert release">${t("needs_release")}</div>
                                     <div class="card-body">
                                         <h3>${safeLabel}</h3>
@@ -880,9 +913,11 @@
                         const statusStatClass = unpaidBalance > 0 ? "unpaid" : "occupied-stat";
                         const statusStatLabel = unpaidBalance > 0 ? t("unpaid") : t("occupied");
 
+                        const moveIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openMovePicker('${tbl.table_id}', '${safeLabel}')">⇄</span>`;
+
                         grid.innerHTML += `
                             <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${tbl.table_id}')">
-                                ${historyIcon}
+                                <div class="icon-row">${moveIcon}${historyIcon}</div>
                                 ${bannerHtml}
                                 <div class="card-body">
                                     <h3>${safeLabel}</h3>
@@ -911,6 +946,54 @@
                     if (currentTableId) openTableModal(currentTableId, true);
                 });
             });
+        }
+
+        function openMovePicker(fromTableId, fromLabel) {
+            moveFromTableId = fromTableId;
+            const content = document.getElementById("moveModalContent");
+            content.innerHTML = `<div class="loading-block"><div class="spinner"></div></div>`;
+            document.getElementById("moveOverlay").style.display = "flex";
+
+            const tables = window._tablesCache || [];
+            const emptyTables = tables.filter(t => !t.active_session_id && t.table_id !== fromTableId);
+
+            const listHtml = emptyTables.length
+                ? emptyTables.map(t => {
+                    const label = escapeHtml(t.display_label || t.table_id);
+                    return `<button class="move-target-btn" onclick="confirmMove('${t.table_id}')">${label} <span>→</span></button>`;
+                }).join("")
+                : `<p class="move-empty-msg">${t("move_no_empty")}</p>`;
+
+            content.innerHTML = `
+                <h2>${t("move_title", fromLabel)}</h2>
+                <div style="margin-top:16px;">${listHtml}</div>
+                <p id="moveModalResult" style="margin-top:10px; font-size:13px; font-weight:600; color:#c0392b;"></p>
+            `;
+        }
+
+        function closeMoveModal() {
+            document.getElementById("moveOverlay").style.display = "none";
+            moveFromTableId = null;
+        }
+
+        function confirmMove(toTableId) {
+            const tables = window._tablesCache || [];
+            const fromTable = tables.find(t => t.table_id === moveFromTableId);
+            if (!fromTable || !fromTable.active_session_id) return;
+
+            fetch(`${BASE}/sessions/${fromTable.active_session_id}/move?to_table_id=${encodeURIComponent(toTableId)}`, {
+                method: "POST",
+                headers: authHeaders()
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById("moveModalResult").innerText = data.error;
+                        return;
+                    }
+                    closeMoveModal();
+                    loadTables();
+                });
         }
 
         function openTableModal(tableId, silent) {
@@ -1000,6 +1083,7 @@
                                         ${ordersHtml}
                                         <div class="action-row">
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
+                                            <button class="secondary" onclick="openMovePicker('${tableId}', '${safeLabel}')">⇄ ${t("move_table")}</button>
                                             <button class="secondary" onclick="releaseTable('${tableId}')">${t("release_table")}</button>
                                             <button class="danger" onclick="deleteSession('${session.session_id}')">${t("delete_session")}</button>
                                         </div>
