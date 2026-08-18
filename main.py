@@ -148,12 +148,6 @@ def init_db():
         conn.rollback()
 
     try:
-        cur.execute("ALTER TABLE orders ADD COLUMN paid INTEGER DEFAULT 0")
-        conn.commit()
-    except psycopg2.errors.DuplicateColumn:
-        conn.rollback()
-
-    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -231,7 +225,12 @@ def get_revenue_stats(_auth: None = Depends(verify_waiter)):
     cur.execute("SELECT COALESCE(SUM(price * qty), 0) as total FROM orders WHERE status = 'APPROVED'")
     total_revenue = cur.fetchone()["total"]
 
-    cur.execute("SELECT COALESCE(SUM(price * qty), 0) as unpaid FROM orders WHERE status = 'APPROVED' AND paid = 0")
+    cur.execute("""
+        SELECT COALESCE(SUM(o.price * o.qty), 0) as unpaid
+        FROM orders o
+        JOIN sessions s ON o.session_id = s.session_id
+        WHERE o.status = 'APPROVED' AND s.status = 'OPEN' AND s.is_paid = 0
+    """)
     unpaid_amount = cur.fetchone()["unpaid"]
 
     cur.close()
@@ -468,20 +467,14 @@ def release_table(table_id: str, _auth: None = Depends(verify_waiter), waiter_na
         conn.close()
         return {"error": "Table has no active session"}
 
-    session_id = table["active_session_id"]
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (table["active_session_id"],))
+    session = cur.fetchone()
 
-    cur.execute(
-        "SELECT COALESCE(SUM(price * qty), 0) as bal FROM orders WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
-        (session_id,),
-    )
-    balance = cur.fetchone()["bal"]
-
-    if balance > 0:
+    if session and session["status"] not in ("CLOSED", "DELETED"):
         cur.close()
         conn.close()
-        return {"error": f"Cannot release — outstanding balance of €{balance:.2f}"}
+        return {"error": "Session must be closed before releasing the table"}
 
-    cur.execute("UPDATE sessions SET status = 'CLOSED' WHERE session_id = %s", (session_id,))
     cur.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = %s", (table_id,))
     conn.commit()
     cur.close()
@@ -500,23 +493,12 @@ def get_session(session_id: str):
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
-
-    if session is None:
-        cur.close()
-        conn.close()
-        return {"error": "Session not found"}
-
-    cur.execute(
-        "SELECT COALESCE(SUM(price * qty), 0) as bal FROM orders WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
-        (session_id,),
-    )
-    unpaid_balance = cur.fetchone()["bal"]
     cur.close()
     conn.close()
 
-    result = dict(session)
-    result["unpaid_balance"] = float(unpaid_balance)
-    return result
+    if session is None:
+        return {"error": "Session not found"}
+    return dict(session)
 
 
 @app.get("/sessions")
@@ -741,20 +723,17 @@ def mark_paid(session_id: str, _auth: None = Depends(verify_waiter), waiter_name
         return {"error": "Session not found"}
 
     cur.execute(
-        "UPDATE orders SET paid = 1 WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
+        "UPDATE sessions SET is_paid = 1, payment_requested = 0, status = 'CLOSED' WHERE session_id = %s",
         (session_id,),
     )
-    cur.execute(
-        "UPDATE sessions SET payment_requested = 0 WHERE session_id = %s",
-        (session_id,),
-    )
+    cur.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = %s", (session["table_id"],))
     conn.commit()
     cur.close()
     conn.close()
 
-    log_action(waiter_name, "marked orders as paid", session_id)
+    log_action(waiter_name, "marked paid and released table", session_id)
 
-    return {"session_id": session_id, "marked_paid": True}
+    return {"session_id": session_id, "is_paid": True, "released": True}
 
 
 @app.post("/sessions/{session_id}/call-waiter")
@@ -860,7 +839,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, paid) VALUES (%s, %s, %s, %s, %s, %s, %s, 0)",
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key) VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (order_id, session_id, item, qty, price, "PENDING_REVIEW", idempotency_key),
     )
     conn.commit()
