@@ -310,6 +310,8 @@
             margin-right: 12px;
         }
         .cart-bar .left { display: flex; align-items: center; font-size: 16px; font-weight: 700; }
+        .cart-bar .right { display: flex; align-items: center; gap: 10px; }
+        .cart-bar .total { font-size: 17px; font-weight: 800; }
         .cart-bar .arrow { font-size: 20px; }
 
         .overlay {
@@ -347,6 +349,14 @@
             border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: 800;
         }
         .qty-controls .qty-num { font-weight: 800; min-width: 20px; text-align: center; font-size: 16px; }
+        .cart-total-row {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0 0;
+        }
+        .cart-total-row .label { color: #777; font-weight: 600; font-size: 14px; }
+        .cart-total-row .amount { color: #ff6b35; font-weight: 800; font-size: 18px; }
         .submit-btn {
             background: linear-gradient(135deg, #ff6b35, #f7931e);
             color: white; border: none;
@@ -425,7 +435,10 @@
             <div class="count" id="cartCount">0</div>
             <span id="cartSummary">View cart</span>
         </div>
-        <span class="arrow">→</span>
+        <div class="right">
+            <span class="total" id="cartBarTotal"></span>
+            <span class="arrow">→</span>
+        </div>
     </div>
 
     <div class="overlay" id="overlay">
@@ -435,6 +448,10 @@
                 <div class="sheet-handle"></div>
                 <h2 id="cartTitle">Your Cart</h2>
                 <div id="cartLines"></div>
+                <div class="cart-total-row" id="cartTotalRow">
+                    <span class="label" id="cartTotalLabel">Total</span>
+                    <span class="amount" id="cartTotalAmount">€0.00</span>
+                </div>
                 <button class="submit-btn" id="submitBtn" onclick="submitCart()">Send Order to Waiter</button>
             </div>
         </div>
@@ -464,13 +481,14 @@
                 tagline_sub: "Φρέσκες επιλογές, φτιαγμένες κατά παραγγελία, στο τραπέζι σας",
                 call_waiter_btn: "🔔 Κλήση Σερβιτόρου",
                 waiter_notified: "🔔 Ο σερβιτόρος ειδοποιήθηκε",
-                request_bill_btn: "💳 Αίτημα Λογαριασμού",
+                request_bill_btn: "💳 Πληρωμή",
                 bill_requested: "💳 Ζητήθηκε ο λογαριασμός",
                 your_orders: "Οι Παραγγελίες σας",
                 bill_so_far: "Λογαριασμός μέχρι τώρα",
                 no_orders: "Δεν υπάρχουν παραγγελίες ακόμα.",
                 your_cart: "Το Καλάθι σας",
                 cart_empty: "Το καλάθι σας είναι άδειο.",
+                cart_total_label: "Σύνολο",
                 send_order: "Αποστολή Παραγγελίας στον Σερβιτόρο",
                 sending: "Αποστολή...",
                 send_error: "Κάτι πήγε στραβά — παρακαλώ δοκιμάστε ξανά.",
@@ -498,6 +516,7 @@
                 no_orders: "No orders yet.",
                 your_cart: "Your Cart",
                 cart_empty: "Your cart is empty.",
+                cart_total_label: "Total",
                 send_order: "Send Order to Waiter",
                 sending: "Sending...",
                 send_error: "Something went wrong — please try again.",
@@ -527,6 +546,7 @@
             document.getElementById("taglineSubText").innerText = t("tagline_sub");
             document.getElementById("cartTitle").innerText = t("your_cart");
             document.getElementById("submitBtn").innerText = t("send_order");
+            document.getElementById("cartTotalLabel").innerText = t("cart_total_label");
             if (!tableId) {
                 document.getElementById("tableLabel").innerText = t("no_table_linked");
             } else if (document.getElementById("tableLabel").dataset.hasTable) {
@@ -553,6 +573,10 @@
         function getCategory(item) {
             const data = menu[item];
             return (typeof data === "object" && data.category) ? data.category : "other";
+        }
+
+        function calcCartTotal() {
+            return Object.keys(cart).reduce((sum, item) => sum + (Number(getPrice(item)) * cart[item]), 0);
         }
 
         function generateIdempotencyKey() {
@@ -777,6 +801,7 @@
                 bar.classList.remove("empty");
                 document.getElementById("cartCount").innerText = totalItems;
                 document.getElementById("cartSummary").innerText = t("view_cart");
+                document.getElementById("cartBarTotal").innerText = `€${calcCartTotal().toFixed(2)}`;
             }
         }
 
@@ -803,6 +828,14 @@
                     </div>
                 `).join("")
                 : `<p style='color:#999; padding:24px 0;'>${t("cart_empty")}</p>`;
+
+            const totalRow = document.getElementById("cartTotalRow");
+            if (items.length) {
+                totalRow.style.display = "flex";
+                document.getElementById("cartTotalAmount").innerText = `€${calcCartTotal().toFixed(2)}`;
+            } else {
+                totalRow.style.display = "none";
+            }
         }
 
         function submitCart() {
