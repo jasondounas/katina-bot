@@ -604,6 +604,54 @@ def update_party_size(session_id: str, party_size: int, _auth: None = Depends(ve
     return {"session_id": session_id, "party_size": party_size}
 
 
+@app.post("/sessions/{session_id}/move")
+def move_session(session_id: str, to_table_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    session = cur.fetchone()
+
+    if session is None:
+        cur.close()
+        conn.close()
+        return {"error": "Session not found"}
+
+    if session["status"] != "OPEN":
+        cur.close()
+        conn.close()
+        return {"error": "Session is not open"}
+
+    if session["table_id"] == to_table_id:
+        cur.close()
+        conn.close()
+        return {"error": "Already at this table"}
+
+    cur.execute("SELECT * FROM tables WHERE table_id = %s", (to_table_id,))
+    target = cur.fetchone()
+
+    if target is None:
+        cur.close()
+        conn.close()
+        return {"error": "Target table not found"}
+
+    if target["active_session_id"] is not None:
+        cur.close()
+        conn.close()
+        return {"error": "Target table is not empty"}
+
+    old_table_id = session["table_id"]
+    cur.execute("UPDATE sessions SET table_id = %s WHERE session_id = %s", (to_table_id, session_id))
+    cur.execute("UPDATE tables SET active_session_id = NULL WHERE table_id = %s", (old_table_id,))
+    cur.execute("UPDATE tables SET active_session_id = %s WHERE table_id = %s", (session_id, to_table_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "moved table", session_id)
+
+    return {"session_id": session_id, "from_table_id": old_table_id, "to_table_id": to_table_id, "moved": True}
+
+
 @app.delete("/sessions/{session_id}")
 def delete_session(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
