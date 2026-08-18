@@ -461,7 +461,7 @@
                 pending_short: (n) => `🧾 ${n} εκκρ.`,
                 calling_waiter: "🔔 ΚΑΛΕΙ ΣΕΡΒΙΤΟΡΟ",
                 wants_to_pay: (m) => `💳 ΘΕΛΕΙ ΝΑ ΠΛΗΡΩΣΕΙ${m ? " — " + m : ""}`,
-                new_orders: (n) => `🧾 ${n} ΝΕΑ ΠΑΡΑΓΓΕΛΙΑ${n > 1 ? "ΕΣ" : ""}`,
+                new_orders: (n) => `🧾 ${n} ${n > 1 ? "ΝΕΕΣ ΠΑΡΑΓΓΕΛΕΙΕΣ" : "ΝΕΑ ΠΑΡΑΓΓΕΛΙΑ"}`,
                 needs_release: "⏹️ ΧΡΕΙΑΖΕΤΑΙ ΑΠΕΛΕΥΘΕΡΩΣΗ",
                 session_status: (s) => `Συνεδρία: ${s}`,
                 cash: "💵 Μετρητά",
@@ -475,6 +475,7 @@
                 session_ended_msg: (s) => `⏹️ Αυτή η συνεδρία έχει τελειώσει (${s}), αλλά το τραπέζι δεν έχει απελευθερωθεί ακόμα.`,
                 release_table: "Απελευθέρωση Τραπεζιού",
                 edit: "✏️ Επεξεργασία",
+                edit_party_size: "✏️ Αλλαγή Ατόμων",
                 bill_so_far: (a) => `💶 Λογαριασμός: €${a}`,
                 customer_link: "Σύνδεσμος πελάτη ↗",
                 table_called_msg: "🔔 Αυτό το τραπέζι κάλεσε σερβιτόρο.",
@@ -547,6 +548,7 @@
                 session_ended_msg: (s) => `⏹️ This session has ended (${s}), but the table hasn't been released yet.`,
                 release_table: "Release Table",
                 edit: "✏️ Edit",
+                edit_party_size: "✏️ Edit Party Size",
                 bill_so_far: (a) => `💶 Bill so far: €${a}`,
                 customer_link: "Customer link ↗",
                 table_called_msg: "🔔 This table called for a waiter.",
@@ -986,7 +988,7 @@
                                         <h2>${safeLabel}${renameIcon}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">
                                             ${t("people", session.party_size)}
-                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit")}</span>
+                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit_party_size")}</span>
                                             &nbsp;|&nbsp; ${session.is_paid ? t("paid") : t("unpaid")}
                                         </p>
                                         <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
