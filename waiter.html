@@ -295,9 +295,9 @@
             padding: 6px 12px; border-radius: 10px;
             display: flex; align-items: center; gap: 5px;
         }
+        .stat.paid { background: #e6f5f3; color: #1d7d72; }
         .stat.unpaid { background: #fce8e6; color: #c0392b; }
         .stat.empty-stat { background: #e6f5f3; color: #1d7d72; }
-        .stat.occupied-stat { background: #e6f0fc; color: #1d5fd7; }
 
         .overlay {
             display: none;
@@ -480,7 +480,7 @@
                 no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
                 tables: "Τραπέζια",
                 empty: "🟢 Άδειο",
-                occupied: "🔵 Κατειλημμένο",
+                paid: "💰 Πληρωμένο",
                 unpaid: "❌ Απλήρωτο",
                 people: (n) => `👥 ${n}`,
                 pending_short: (n) => `🧾 ${n} εκκρ.`,
@@ -528,7 +528,7 @@
                     "opened session": "άνοιξε συνεδρία",
                     "updated party size": "ενημέρωσε αριθμό ατόμων",
                     "deleted session": "διέγραψε συνεδρία",
-                    "marked orders as paid": "σήμανε παραγγελίες ως πληρωμένες",
+                    "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
                     "rejected order": "απέρριψε παραγγελία",
@@ -557,7 +557,7 @@
                 no_alerts: "No active alerts 🎉",
                 tables: "Tables",
                 empty: "🟢 Empty",
-                occupied: "🔵 Occupied",
+                paid: "💰 Paid",
                 unpaid: "❌ Unpaid",
                 people: (n) => `👥 ${n}`,
                 pending_short: (n) => `🧾 ${n} pending`,
@@ -888,7 +888,6 @@
                         }
 
                         const pending = pendingCountBySession[session.session_id] || 0;
-                        const unpaidBalance = session.unpaid_balance || 0;
 
                         let bannerClass = "";
                         let bannerText = "";
@@ -910,9 +909,6 @@
                             ? `<div class="card-alert ${bannerClass}">${bannerText}</div>`
                             : "";
 
-                        const statusStatClass = unpaidBalance > 0 ? "unpaid" : "occupied-stat";
-                        const statusStatLabel = unpaidBalance > 0 ? t("unpaid") : t("occupied");
-
                         const moveIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openMovePicker('${tbl.table_id}', '${safeLabel}')">⇄</span>`;
 
                         grid.innerHTML += `
@@ -923,7 +919,7 @@
                                     <h3>${safeLabel}</h3>
                                     <div class="card-stats">
                                         <span class="stat">${t("people", session.party_size)}</span>
-                                        <span class="stat ${statusStatClass}">${statusStatLabel}</span>
+                                        <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? t("paid") : t("unpaid")}</span>
                                         ${pending > 0 && bannerClass !== "pending" ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
                                     </div>
                                 </div>
@@ -1043,7 +1039,9 @@
                                 .then(orders => {
                                     const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌" };
 
-                                    const unpaidBalance = session.unpaid_balance || 0;
+                                    const billTotal = orders
+                                        .filter(o => o.status === "APPROVED")
+                                        .reduce((sum, o) => sum + (o.price * o.qty), 0);
 
                                     let ordersHtml = orders.length
                                         ? orders.map(o => `
@@ -1074,9 +1072,9 @@
                                         <p style="color:#777; margin:6px 0 12px;">
                                             ${t("people", session.party_size)}
                                             <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit_party_size")}</span>
-                                            &nbsp;|&nbsp; ${unpaidBalance > 0 ? t("unpaid") : t("occupied")}
+                                            &nbsp;|&nbsp; ${session.is_paid ? t("paid") : t("unpaid")}
                                         </p>
-                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", unpaidBalance.toFixed(2))}</p>
+                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
                                         ${alerts}
                                         <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
@@ -1084,7 +1082,6 @@
                                         <div class="action-row">
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
                                             <button class="secondary" onclick="openMovePicker('${tableId}', '${safeLabel}')">⇄ ${t("move_table")}</button>
-                                            <button class="secondary" onclick="releaseTable('${tableId}')">${t("release_table")}</button>
                                             <button class="danger" onclick="deleteSession('${session.session_id}')">${t("delete_session")}</button>
                                         </div>
                                         <p id="modalResult"></p>
@@ -1193,7 +1190,7 @@
                 headers: authHeaders()
             })
                 .then(r => r.json())
-                .then(() => { openTableModal(currentTableId); loadTables(); });
+                .then(() => { closeModal(); loadTables(); });
         }
 
         function deleteSession(sessionId) {
