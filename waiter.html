@@ -1120,7 +1120,10 @@
                                     let ordersHtml = orders.length
                                         ? orders.map(o => `
                                             <div class="order-line">
-                                                <div class="info">${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}</div>
+                                                <div class="info">
+                                                    ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
+                                                    ${o.note ? `<div style="font-size:11.5px; color:#7c3aed; font-style:italic; margin-top:2px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                                </div>
                                                 <div class="actions">
                                                     ${o.status === "PENDING_REVIEW" ? `
                                                         <button class="success" onclick="approveOrder('${o.order_id}')">${t("accept")}</button>
