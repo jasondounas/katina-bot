@@ -148,6 +148,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN note TEXT DEFAULT ''")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -817,7 +823,7 @@ def get_price_from_db(item: str) -> float:
 
 
 @app.post("/orders")
-def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None):
+def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None, note: str = ""):
     if qty < 1:
         return {"error": "Quantity must be at least 1"}
 
@@ -844,8 +850,8 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (order_id, session_id, item, qty, price, "PENDING_REVIEW", idempotency_key),
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+        (order_id, session_id, item, qty, price, "PENDING_REVIEW", idempotency_key, note),
     )
     conn.commit()
     cur.close()
@@ -858,15 +864,16 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         "qty": qty,
         "price": price,
         "status": "PENDING_REVIEW",
+        "note": note,
     }
 
 
-def send_kitchen_ticket(order_id: str, item: str, qty: int) -> str:
+def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "") -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
                 f"{PDA_URL}/kitchen-ticket",
-                params={"order_id": order_id, "item": item, "qty": qty},
+                params={"order_id": order_id, "item": item, "qty": qty, "note": note},
                 timeout=5.0,
             )
             if response.status_code == 200:
@@ -895,7 +902,7 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         conn.close()
         return {"error": "Order already processed"}
 
-    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"])
+    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "")
 
     cur.execute("UPDATE orders SET status = %s, handled_by = %s WHERE order_id = %s", ("APPROVED", waiter_name, order_id))
     conn.commit()
