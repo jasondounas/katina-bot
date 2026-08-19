@@ -476,6 +476,7 @@
         let moveFromTableId = null;
         let currentAlerts = [];
         let previousAlertKeys = new Set();
+        let hasLoadedTablesOnce = false;
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -976,11 +977,12 @@
                     const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
                     const newAlerts = currentAlerts.filter(a => !previousAlertKeys.has(`${a.tableId}-${a.type}`));
 
-                    if (newAlerts.length > 0 && previousAlertKeys.size > 0) {
+                    if (newAlerts.length > 0 && hasLoadedTablesOnce) {
                         playNotificationSound();
                         newAlerts.forEach(a => showToast(a));
                     }
                     previousAlertKeys = currentAlertKeys;
+                    hasLoadedTablesOnce = true;
 
                     document.getElementById("bellCount").innerText = currentAlerts.length;
                     if (document.getElementById("notifDrawer").classList.contains("open")) renderNotifPanel();
