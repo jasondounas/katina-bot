@@ -470,6 +470,7 @@
                 unlock: "Ξεκλείδωμα",
                 enter_name: "Παρακαλώ εισάγετε το όνομά σας.",
                 wrong_code: "Λάθος κωδικός, δοκιμάστε ξανά.",
+                session_expired: "Η σύνδεσή σας έληξε. Παρακαλώ συνδεθείτε ξανά.",
                 waiter_title: "Katina — Σερβιτόρος",
                 logged_in_as: (n) => `Συνδεδεμένος ως ${n}`,
                 notifications: "🔔 Ειδοποιήσεις",
@@ -547,6 +548,7 @@
                 unlock: "Unlock",
                 enter_name: "Please enter your name.",
                 wrong_code: "Incorrect code, try again.",
+                session_expired: "Your session expired. Please log in again.",
                 waiter_title: "Katina — Waiter",
                 logged_in_as: (n) => `Logged in as ${n}`,
                 notifications: "🔔 Notifications",
@@ -688,8 +690,7 @@
             }
             if (!code) return;
 
-            fetch(`${BASE}/tables?table_id=__token_check__`, {
-                method: "POST",
+            fetch(`${BASE}/verify-token`, {
                 headers: { "X-Waiter-Token": code }
             }).then(r => {
                 if (r.status === 401) {
@@ -702,8 +703,11 @@
                 localStorage.setItem("waiterToken", code);
                 localStorage.setItem("waiterName", name);
                 document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("loginError").innerText = "";
                 document.getElementById("whoamiLabel").innerText = t("logged_in_as", name);
                 loadTables();
+            }).catch(() => {
+                document.getElementById("loginError").innerText = t("wrong_code");
             });
         }
 
@@ -712,6 +716,30 @@
                 "X-Waiter-Token": getToken(),
                 "X-Waiter-Name": getWaiterName()
             };
+        }
+
+        function handleAuthFailure() {
+            localStorage.removeItem("waiterToken");
+            localStorage.removeItem("waiterName");
+            document.getElementById("overlay").style.display = "none";
+            document.getElementById("moveOverlay").style.display = "none";
+            closeAllDrawers();
+            currentTableId = null;
+            moveFromTableId = null;
+            document.getElementById("loginScreen").style.display = "flex";
+            document.getElementById("loginError").innerText = t("session_expired");
+        }
+
+        function authFetch(url, options) {
+            const opts = options || {};
+            opts.headers = Object.assign({}, opts.headers || {}, authHeaders());
+            return fetch(url, opts).then(r => {
+                if (r.status === 401) {
+                    handleAuthFailure();
+                    return null;
+                }
+                return r;
+            });
         }
 
         function escapeHtml(str) {
@@ -740,9 +768,9 @@
             document.getElementById("logDrawer").classList.add("open");
             document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div></div>`;
 
-            fetch(`${BASE}/activity-log`, { headers: authHeaders() })
-                .then(r => r.json())
-                .then(logs => renderLogList(logs));
+            authFetch(`${BASE}/activity-log`)
+                .then(r => r ? r.json() : null)
+                .then(logs => { if (logs) renderLogList(logs); });
         }
 
         function openTableHistory(tableId, label) {
@@ -751,9 +779,9 @@
             document.getElementById("logDrawer").classList.add("open");
             document.getElementById("logList").innerHTML = `<div class="loading-block"><div class="spinner light"></div></div>`;
 
-            fetch(`${BASE}/tables/${tableId}/history`, { headers: authHeaders() })
-                .then(r => r.json())
-                .then(logs => renderLogList(logs, t("no_history")));
+            authFetch(`${BASE}/tables/${tableId}/history`)
+                .then(r => r ? r.json() : null)
+                .then(logs => { if (logs) renderLogList(logs, t("no_history")); });
         }
 
         function renderLogList(logs, emptyMessage) {
@@ -977,12 +1005,12 @@
             const fromTable = tables.find(t => t.table_id === moveFromTableId);
             if (!fromTable || !fromTable.active_session_id) return;
 
-            fetch(`${BASE}/sessions/${fromTable.active_session_id}/move?to_table_id=${encodeURIComponent(toTableId)}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/sessions/${fromTable.active_session_id}/move?to_table_id=${encodeURIComponent(toTableId)}`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("moveModalResult").innerText = data.error;
                         return;
@@ -1095,12 +1123,12 @@
             const newLabel = prompt(t("rename_prompt"), currentLabel);
             if (newLabel === null || !newLabel.trim()) return;
 
-            fetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("modalResult").innerText = data.error;
                         return;
@@ -1114,12 +1142,12 @@
             const newSize = prompt(t("party_size_prompt"), currentSize);
             if (newSize === null) return;
 
-            fetch(`${BASE}/sessions/${sessionId}/update-party-size?party_size=${newSize}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/sessions/${sessionId}/update-party-size?party_size=${newSize}`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("modalResult").innerText = data.error;
                         return;
@@ -1132,12 +1160,12 @@
         function openSessionForCurrentTable() {
             const partySize = 2;
 
-            fetch(`${BASE}/sessions/open?table_id=${currentTableId}&party_size=${partySize}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/sessions/open?table_id=${currentTableId}&party_size=${partySize}`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("modalResult").innerText = data.error;
                         return;
@@ -1158,58 +1186,78 @@
                 .then(tables => {
                     const table = tables.find(t => t.table_id === currentTableId);
                     if (!table || !table.active_session_id) return;
-                    fetch(`${BASE}/sessions/${table.active_session_id}/acknowledge-call`, {
-                        method: "POST",
-                        headers: authHeaders()
+                    authFetch(`${BASE}/sessions/${table.active_session_id}/acknowledge-call`, {
+                        method: "POST"
                     })
-                        .then(() => { openTableModal(currentTableId); loadTables(); });
+                        .then(r => r ? r.json() : null)
+                        .then(data => { if (data) { openTableModal(currentTableId); loadTables(); } });
                 });
         }
 
         function approveOrder(orderId) {
-            fetch(`${BASE}/orders/${orderId}/approve`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/orders/${orderId}/approve`, {
+                method: "POST"
             })
-                .then(r => r.json())
-                .then(() => { openTableModal(currentTableId); loadTables(); });
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
+                });
         }
 
         function rejectOrder(orderId) {
-            fetch(`${BASE}/orders/${orderId}/reject`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/orders/${orderId}/reject`, {
+                method: "POST"
             })
-                .then(r => r.json())
-                .then(() => { openTableModal(currentTableId); loadTables(); });
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
+                });
         }
 
         function markPaid(sessionId) {
-            fetch(`${BASE}/sessions/${sessionId}/mark-paid`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/sessions/${sessionId}/mark-paid`, {
+                method: "POST"
             })
-                .then(r => r.json())
-                .then(() => { closeModal(); loadTables(); });
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    closeModal();
+                    loadTables();
+                });
         }
 
         function deleteSession(sessionId) {
             if (!confirm(t("delete_session_confirm"))) return;
-            fetch(`${BASE}/sessions/${sessionId}`, {
-                method: "DELETE",
-                headers: authHeaders()
+            authFetch(`${BASE}/sessions/${sessionId}`, {
+                method: "DELETE"
             })
-                .then(r => r.json())
-                .then(() => { openTableModal(currentTableId); loadTables(); });
+                .then(r => r ? r.json() : null)
+                .then(data => { if (data) { openTableModal(currentTableId); loadTables(); } });
         }
 
         function releaseTable(tableId) {
-            fetch(`${BASE}/tables/${tableId}/release`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/tables/${tableId}/release`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("modalResult").innerText = data.error;
                         return;
