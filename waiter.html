@@ -478,6 +478,19 @@
         let previousAlertKeys = new Set();
         let hasLoadedTablesOnce = false;
 
+        let audioCtx = null;
+
+        function unlockAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === "suspended") {
+                audioCtx.resume();
+            }
+        }
+        document.addEventListener("click", unlockAudio, { once: true });
+        document.addEventListener("touchstart", unlockAudio, { once: true });
+
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
         const T = {
@@ -654,17 +667,18 @@
         }
 
         function playNotificationSound() {
+            if (!audioCtx) return;
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = ctx.createOscillator();
-                const gain = ctx.createGain();
+                if (audioCtx.state === "suspended") audioCtx.resume();
+                const oscillator = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
                 oscillator.connect(gain);
-                gain.connect(ctx.destination);
+                gain.connect(audioCtx.destination);
                 oscillator.frequency.value = 880;
-                gain.gain.setValueAtTime(0.3, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
                 oscillator.start();
-                oscillator.stop(ctx.currentTime + 0.3);
+                oscillator.stop(audioCtx.currentTime + 0.3);
             } catch (e) {
                 console.log("Could not play notification sound", e);
             }
@@ -948,7 +962,7 @@
                         } else if (pending > 0) {
                             bannerClass = "pending"; bannerText = t("new_orders", pending);
                         }
-                        if (pending > 0 && bannerClass !== "pending") {
+                        if (pending > 0) {
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
                         }
 
@@ -967,7 +981,7 @@
                                     <div class="card-stats">
                                         <span class="stat">${t("people", session.party_size)}</span>
                                         <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? t("paid") : t("unpaid")}</span>
-                                        ${pending > 0 && bannerClass !== "pending" ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
+                                        ${pending > 0 ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
                                     </div>
                                 </div>
                             </div>
