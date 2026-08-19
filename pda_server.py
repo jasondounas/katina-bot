@@ -10,36 +10,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MENU = {
-    "coke": {
-        "price": 3.50,
-        "image": "https://katina-bot-2.onrender.com/image/coke.jpg",
-        "description": "Ice-cold classic, served in a chilled glass"
-    },
-    "burger": {
-        "price": 9.90,
-        "image": "https://katina-bot-2.onrender.com/image/burger.jpg",
-        "description": "Juicy beef patty, cheddar, house sauce, brioche bun"
-    },
-    "salad": {
-        "price": 7.20,
-        "image": "https://katina-bot-2.onrender.com/image/salad.jpg",
-        "description": "Crisp greens, feta, olives, house vinaigrette"
-    },
-}
-
 kitchen_tickets = []
 
 
-@app.get("/menu")
-def get_menu():
-    return MENU
+@app.get("/")
+def root():
+    return {"status": "alive"}
 
 
 @app.post("/kitchen-ticket")
-def kitchen_ticket(order_id: str, item: str, qty: int):
-    print(f"🧾 KITCHEN TICKET — Order {order_id}: {qty}x {item}")
-    kitchen_tickets.append({"order_id": order_id, "item": item, "qty": qty, "done": False})
+def kitchen_ticket(order_id: str, item: str, qty: int, note: str = ""):
+    print(f"🧾 KITCHEN TICKET — Order {order_id}: {qty}x {item}" + (f" (note: {note})" if note else ""))
+    kitchen_tickets.append({"order_id": order_id, "item": item, "qty": qty, "note": note, "done": False})
     return {"success": True}
 
 
