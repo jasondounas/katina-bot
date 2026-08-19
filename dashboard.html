@@ -505,6 +505,7 @@
                 unlock: "Ξεκλείδωμα",
                 enter_name: "Παρακαλώ εισάγετε το όνομά σας.",
                 wrong_code: "Λάθος κωδικός, δοκιμάστε ξανά.",
+                session_expired: "Η σύνδεσή σας έληξε. Παρακαλώ συνδεθείτε ξανά.",
                 dashboard_title: "Katina — Πίνακας Ελέγχου",
                 logged_in_as: (n) => `Συνδεδεμένος ως ${n}`,
                 total_revenue: "Συνολικά Έσοδα",
@@ -579,7 +580,8 @@
                     "deleted order": "διέγραψε παραγγελία",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
-                    "deleted menu item": "διέγραψε προϊόν μενού"
+                    "deleted menu item": "διέγραψε προϊόν μενού",
+                    "moved table": "μετακίνησε τραπέζι"
                 }
             },
             en: {
@@ -590,6 +592,7 @@
                 unlock: "Unlock",
                 enter_name: "Please enter your name.",
                 wrong_code: "Incorrect code, try again.",
+                session_expired: "Your session expired. Please log in again.",
                 dashboard_title: "Katina — Dashboard",
                 logged_in_as: (n) => `Logged in as ${n}`,
                 total_revenue: "Total Revenue",
@@ -735,8 +738,7 @@
             }
             if (!code) return;
 
-            fetch(`${BASE}/tables?table_id=__token_check__`, {
-                method: "POST",
+            fetch(`${BASE}/verify-token`, {
                 headers: { "X-Waiter-Token": code }
             }).then(r => {
                 if (r.status === 401) {
@@ -749,8 +751,11 @@
                 localStorage.setItem("waiterToken", code);
                 localStorage.setItem("waiterName", name);
                 document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("loginError").innerText = "";
                 document.getElementById("whoamiLabel").innerText = t("logged_in_as", name);
                 init();
+            }).catch(() => {
+                document.getElementById("loginError").innerText = t("wrong_code");
             });
         }
 
@@ -763,6 +768,38 @@
         }
         function authHeaders() {
             return { "X-Waiter-Token": getToken(), "X-Waiter-Name": getWaiterName() };
+        }
+
+        function handleAuthFailure() {
+            localStorage.removeItem("waiterToken");
+            localStorage.removeItem("waiterName");
+            document.getElementById("editOverlay").style.display = "none";
+            document.getElementById("loginScreen").style.display = "flex";
+            document.getElementById("loginError").innerText = t("session_expired");
+        }
+
+        function authFetch(url, options) {
+            const opts = options || {};
+            opts.headers = Object.assign({}, opts.headers || {}, authHeaders());
+            return fetch(url, opts).then(r => {
+                if (r.status === 401) {
+                    handleAuthFailure();
+                    return null;
+                }
+                return r;
+            });
+        }
+
+        function authFetchJson(url, options) {
+            const opts = options || {};
+            opts.headers = Object.assign({}, opts.headers || {}, authHeadersJson());
+            return fetch(url, opts).then(r => {
+                if (r.status === 401) {
+                    handleAuthFailure();
+                    return null;
+                }
+                return r;
+            });
         }
 
         function escapeHtml(str) {
@@ -894,8 +931,9 @@
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
                 fetch(`${BASE}/sessions`).then(r => r.json()),
-                fetch(`${BASE}/revenue-stats`, { headers: authHeaders() }).then(r => r.json()),
+                authFetch(`${BASE}/revenue-stats`).then(r => r ? r.json() : null),
             ]).then(([tables, pending, sessions, revenue]) => {
+                if (!revenue) return;
                 const occupied = tables.filter(t => t.active_session_id).length;
                 document.getElementById("statsRow").innerHTML = `
                     <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">${t("total_revenue")}</div></div>
@@ -944,9 +982,10 @@
         }
 
         function loadActivity() {
-            fetch(`${BASE}/activity-log`, { headers: authHeaders() })
-                .then(r => r.json())
+            authFetch(`${BASE}/activity-log`)
+                .then(r => r ? r.json() : null)
                 .then(logs => {
+                    if (!logs) return;
                     const list = document.getElementById("activityList");
                     if (!Array.isArray(logs) || logs.length === 0) {
                         list.innerHTML = `<div class="alert-empty">${t("no_activity")}</div>`;
@@ -1007,14 +1046,14 @@
             btn.disabled = true;
             btn.innerText = t("registering");
 
-            fetch(`${BASE}/tables?table_id=${encodeURIComponent(id)}&display_label=${encodeURIComponent(label || id)}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/tables?table_id=${encodeURIComponent(id)}&display_label=${encodeURIComponent(label || id)}`, {
+                method: "POST"
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
                     btn.disabled = false;
                     btn.innerText = originalText;
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("addTableResult").innerText = data.error;
                         return;
@@ -1031,12 +1070,11 @@
             const newLabel = prompt(t("rename_prompt"), currentLabel);
             if (newLabel === null || !newLabel.trim()) return;
 
-            fetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
-                method: "POST",
-                headers: authHeaders()
+            authFetch(`${BASE}/tables/${tableId}/rename?display_label=${encodeURIComponent(newLabel)}`, {
+                method: "POST"
             })
-                .then(r => r.json())
-                .then(() => loadTablesManagement());
+                .then(r => r ? r.json() : null)
+                .then(data => { if (data) loadTablesManagement(); });
         }
 
         function deleteTableFromDashboard(tableId, occupied) {
@@ -1046,12 +1084,12 @@
             }
             if (!confirm(t("delete_table_confirm", tableId))) return;
 
-            fetch(`${BASE}/tables/${tableId}`, {
-                method: "DELETE",
-                headers: authHeaders()
+            authFetch(`${BASE}/tables/${tableId}`, {
+                method: "DELETE"
             })
-                .then(r => r.json())
-                .then(() => {
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
                     loadTablesManagement();
                     loadStats();
                 });
@@ -1120,15 +1158,15 @@
             btn.disabled = true;
             btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;"></div>${t("adding")}`;
 
-            fetch(`${BASE}/menu-items`, {
+            authFetchJson(`${BASE}/menu-items`, {
                 method: "POST",
-                headers: authHeadersJson(),
                 body: JSON.stringify({ item_id: id, name, price, description: desc, image, category })
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
                     btn.disabled = false;
                     btn.innerHTML = originalText;
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("addResult").innerText = data.error;
                         return;
@@ -1150,19 +1188,21 @@
         }
 
         function toggleAvailable(itemId, newValue) {
-            fetch(`${BASE}/menu-items/${itemId}/update`, {
+            authFetchJson(`${BASE}/menu-items/${itemId}/update`, {
                 method: "POST",
-                headers: authHeadersJson(),
                 body: JSON.stringify({ available: newValue })
-            }).then(() => loadMenuItems());
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => { if (data) loadMenuItems(); });
         }
 
         function deleteItem(itemId) {
             if (!confirm(t("delete_confirm", itemId))) return;
-            fetch(`${BASE}/menu-items/${itemId}`, {
-                method: "DELETE",
-                headers: authHeaders()
-            }).then(() => loadMenuItems());
+            authFetch(`${BASE}/menu-items/${itemId}`, {
+                method: "DELETE"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => { if (data) loadMenuItems(); });
         }
 
         function openEdit(itemId) {
@@ -1207,15 +1247,15 @@
             btn.disabled = true;
             btn.innerHTML = `<div class="spinner light" style="width:14px;height:14px;border-width:2px;display:inline-block;"></div>`;
 
-            fetch(`${BASE}/menu-items/${editingItemId}/update`, {
+            authFetchJson(`${BASE}/menu-items/${editingItemId}/update`, {
                 method: "POST",
-                headers: authHeadersJson(),
                 body: JSON.stringify(payload)
             })
-                .then(r => r.json())
+                .then(r => r ? r.json() : null)
                 .then(data => {
                     btn.disabled = false;
                     btn.innerText = originalText;
+                    if (!data) return;
                     if (data.error) {
                         document.getElementById("editResult").innerText = data.error;
                         return;
