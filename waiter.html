@@ -352,9 +352,27 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 10px;
         }
-        .order-line .info { font-size: 14px; font-weight: 600; }
-        .order-line .actions button { margin-left: 6px; font-size: 12px; padding: 8px 12px; }
+        .order-line .info {
+            font-size: 14px;
+            font-weight: 600;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .order-line .actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .order-line .actions button {
+            margin-left: 0;
+            font-size: 12px;
+            padding: 8px 12px;
+        }
         .action-row { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
         .close-modal {
             position: absolute; top: 24px; right: 24px;
