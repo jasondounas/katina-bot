@@ -276,7 +276,8 @@
             box-shadow: 0 3px 10px rgba(0,0,0,0.04);
         }
         .order-status .item-name { font-weight: 700; font-size: 15px; }
-        .pill { font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 20px; }
+        .order-status .item-note { font-size: 12px; color: #999; font-style: italic; margin-top: 2px; }
+        .pill { font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 20px; flex-shrink: 0; margin-left: 10px; }
         .pill.PENDING_REVIEW { background: #fff4e6; color: #b9770e; }
         .pill.APPROVED { background: #e6f5f3; color: #1d7d72; }
         .pill.REJECTED { background: #fce8e6; color: #c0392b; }
@@ -339,8 +340,10 @@
         }
         .sheet h2 { font-size: 24px; margin-bottom: 20px; font-weight: 800; }
         .cart-line {
-            display: flex; justify-content: space-between; align-items: center;
             padding: 14px 0; border-bottom: 1px solid #f2f2f2;
+        }
+        .cart-line-top {
+            display: flex; justify-content: space-between; align-items: center;
         }
         .cart-line .item-name { font-weight: 700; font-size: 16px; }
         .qty-controls { display: flex; align-items: center; gap: 14px; }
@@ -349,6 +352,19 @@
             border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: 800;
         }
         .qty-controls .qty-num { font-weight: 800; min-width: 20px; text-align: center; font-size: 16px; }
+        .note-input {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px 12px;
+            border: 1.5px solid #eee;
+            border-radius: 12px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .note-input:focus {
+            outline: none;
+            border-color: #ff6b35;
+        }
         .cart-total-row {
             display: none;
             justify-content: space-between;
@@ -465,6 +481,7 @@
         let sessionId = null;
         let menu = {};
         let cart = {};
+        let cartNotes = {};
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -489,6 +506,7 @@
                 your_cart: "Το Καλάθι σας",
                 cart_empty: "Το καλάθι σας είναι άδειο.",
                 cart_total_label: "Σύνολο",
+                note_placeholder: "Σχόλιο (π.χ. χωρίς κρεμμύδι)",
                 send_order: "Αποστολή Παραγγελίας στον Σερβιτόρο",
                 sending: "Αποστολή...",
                 send_error: "Κάτι πήγε στραβά — παρακαλώ δοκιμάστε ξανά.",
@@ -517,6 +535,7 @@
                 your_cart: "Your Cart",
                 cart_empty: "Your cart is empty.",
                 cart_total_label: "Total",
+                note_placeholder: "Add a note (e.g. no onions)",
                 send_order: "Send Order to Waiter",
                 sending: "Sending...",
                 send_error: "Something went wrong — please try again.",
@@ -757,10 +776,17 @@
 
         function changeQty(item, delta) {
             cart[item] = (cart[item] || 0) + delta;
-            if (cart[item] <= 0) delete cart[item];
+            if (cart[item] <= 0) {
+                delete cart[item];
+                delete cartNotes[item];
+            }
             updateCartBar();
             updateItemBadges();
             renderCartSheet();
+        }
+
+        function updateNote(item, value) {
+            cartNotes[item] = value;
         }
 
         function updateItemBadges() {
@@ -819,12 +845,17 @@
             div.innerHTML = items.length
                 ? items.map(item => `
                     <div class="cart-line">
-                        <span class="item-name">${escapeHtml(capitalize(item))}</span>
-                        <span class="qty-controls">
-                            <button onclick="changeQty('${item}', -1)">−</button>
-                            <span class="qty-num">${cart[item]}</span>
-                            <button onclick="changeQty('${item}', 1)">+</button>
-                        </span>
+                        <div class="cart-line-top">
+                            <span class="item-name">${escapeHtml(capitalize(item))}</span>
+                            <span class="qty-controls">
+                                <button onclick="changeQty('${item}', -1)">−</button>
+                                <span class="qty-num">${cart[item]}</span>
+                                <button onclick="changeQty('${item}', 1)">+</button>
+                            </span>
+                        </div>
+                        <input type="text" class="note-input" placeholder="${t("note_placeholder")}"
+                               value="${escapeHtml(cartNotes[item] || '')}"
+                               oninput="updateNote('${item}', this.value)">
                     </div>
                 `).join("")
                 : `<p style='color:#999; padding:24px 0;'>${t("cart_empty")}</p>`;
@@ -848,12 +879,14 @@
 
             const requests = items.map(item => {
                 const key = generateIdempotencyKey();
-                return fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}&idempotency_key=${key}`, { method: "POST" })
+                const note = encodeURIComponent(cartNotes[item] || "");
+                return fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}&idempotency_key=${key}&note=${note}`, { method: "POST" })
                     .then(r => r.json());
             });
 
             Promise.all(requests).then(() => {
                 cart = {};
+                cartNotes = {};
                 updateCartBar();
                 updateItemBadges();
                 closeCartSheet();
@@ -892,7 +925,10 @@
                     div.innerHTML = orders.length
                         ? orders.map(o => `
                             <div class="order-status">
-                                <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
+                                <div>
+                                    <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
+                                    ${o.note ? `<div class="item-note">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                </div>
                                 <span class="pill ${o.status}">${t("status_labels")[o.status] || o.status}</span>
                             </div>
                         `).join("")
