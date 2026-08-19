@@ -14,6 +14,16 @@
         }
         .ticket h2 { margin: 0 0 8px 0; font-size: 28px; }
         .ticket p { margin: 4px 0; color: #ccc; }
+        .ticket .note {
+            margin-top: 8px;
+            background: #3d2e17;
+            border-left: 3px solid #f39c12;
+            border-radius: 4px;
+            padding: 8px 10px;
+            color: #ffd699;
+            font-size: 14px;
+            font-style: italic;
+        }
         button {
             margin-top: 10px;
             background: #27ae60;
@@ -51,6 +61,16 @@
            }
        }
 
+       function escapeHtml(str) {
+           if (str === null || str === undefined) return "";
+           return String(str)
+               .replace(/&/g, "&amp;")
+               .replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;")
+               .replace(/"/g, "&quot;")
+               .replace(/'/g, "&#39;");
+       }
+
        function loadTickets() {
     fetch(`${PDA}/kitchen-tickets`)
         .then(r => r.json())
@@ -64,8 +84,9 @@
                     grid.innerHTML = tickets.length
                         ? tickets.map(t => `
                             <div class="ticket">
-                                <h2>${t.qty}x ${t.item}</h2>
+                                <h2>${t.qty}x ${escapeHtml(t.item)}</h2>
                                 <p>Order #${t.order_id}</p>
+                                ${t.note ? `<div class="note">💬 ${escapeHtml(t.note)}</div>` : ""}
                                 <button onclick="markDone('${t.order_id}')">✅ Ready</button>
                             </div>
                         `).join("")
