@@ -476,6 +476,7 @@
         let moveFromTableId = null;
         let currentAlerts = [];
         let previousAlertKeys = new Set();
+        let previousPendingCounts = {};
         let hasLoadedTablesOnce = false;
 
         let audioCtx = null;
@@ -907,6 +908,8 @@
                     });
 
                     currentAlerts = [];
+                    const newOrderEvents = [];
+                    const newPendingCounts = {};
                     const grid = document.getElementById("tableGrid");
                     grid.innerHTML = "";
 
@@ -949,6 +952,12 @@
                         }
 
                         const pending = pendingCountBySession[session.session_id] || 0;
+                        const prevPending = previousPendingCounts[session.session_id] || 0;
+                        newPendingCounts[session.session_id] = pending;
+
+                        if (pending > prevPending && hasLoadedTablesOnce) {
+                            newOrderEvents.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
+                        }
 
                         let bannerClass = "";
                         let bannerText = "";
@@ -988,12 +997,15 @@
                         `;
                     });
 
-                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
-                    const newAlerts = currentAlerts.filter(a => !previousAlertKeys.has(`${a.tableId}-${a.type}`));
+                    previousPendingCounts = newPendingCounts;
 
-                    if (newAlerts.length > 0 && hasLoadedTablesOnce) {
+                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
+                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && !previousAlertKeys.has(`${a.tableId}-${a.type}`));
+                    const allTriggerEvents = newStatusAlerts.concat(newOrderEvents);
+
+                    if (allTriggerEvents.length > 0 && hasLoadedTablesOnce) {
                         playNotificationSound();
-                        newAlerts.forEach(a => showToast(a));
+                        allTriggerEvents.forEach(a => showToast(a));
                     }
                     previousAlertKeys = currentAlertKeys;
                     hasLoadedTablesOnce = true;
