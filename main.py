@@ -186,6 +186,11 @@ def root():
     return {"status": "alive"}
 
 
+@app.get("/verify-token")
+def verify_token(_auth: None = Depends(verify_waiter)):
+    return {"valid": True}
+
+
 @app.get("/menu")
 def get_menu():
     conn = get_connection()
