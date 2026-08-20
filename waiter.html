@@ -142,7 +142,7 @@
         header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
 
         .header-actions { display: flex; gap: 8px; align-items: center; }
-        .bell-btn, .log-btn, .lang-btn {
+        .bell-btn, .log-btn, .lang-btn, .logout-btn {
             background: rgba(255,255,255,0.1);
             border: none;
             color: white;
@@ -425,6 +425,7 @@
             <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()">
                 🔔 <span class="bell-count" id="bellCount">0</span>
             </button>
+            <button class="logout-btn" onclick="doLogout()">🚪 <span id="logoutLabel">Logout</span></button>
         </div>
     </header>
 
@@ -550,6 +551,8 @@
                 move_table: "Μετακίνηση",
                 move_title: (l) => `Μετακίνηση από ${l} σε:`,
                 move_no_empty: "Δεν υπάρχουν άδεια τραπέζια αυτή τη στιγμή.",
+                logout: "Αποσύνδεση",
+                logout_confirm: "Αποσύνδεση από αυτή τη συσκευή;",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
@@ -628,6 +631,8 @@
                 move_table: "Move",
                 move_title: (l) => `Move from ${l} to:`,
                 move_no_empty: "No empty tables right now.",
+                logout: "Logout",
+                logout_confirm: "Log out on this device?",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
@@ -662,6 +667,7 @@
             document.getElementById("unlockBtn").innerText = t("unlock");
             document.getElementById("headerTitle").innerText = t("waiter_title");
             document.getElementById("tablesTitle").innerText = t("tables");
+            document.getElementById("logoutLabel").innerText = t("logout");
             if (getWaiterName() !== "Unknown" || getToken()) {
                 document.getElementById("whoamiLabel").innerText = t("logged_in_as", getWaiterName());
             }
@@ -743,6 +749,21 @@
             }).catch(() => {
                 document.getElementById("loginError").innerText = t("wrong_code");
             });
+        }
+
+        function doLogout() {
+            if (!confirm(t("logout_confirm"))) return;
+            localStorage.removeItem("waiterToken");
+            localStorage.removeItem("waiterName");
+            currentTableId = null;
+            moveFromTableId = null;
+            document.getElementById("overlay").style.display = "none";
+            document.getElementById("moveOverlay").style.display = "none";
+            closeAllDrawers();
+            document.getElementById("nameInput").value = "";
+            document.getElementById("loginInput").value = "";
+            document.getElementById("loginError").innerText = "";
+            document.getElementById("loginScreen").style.display = "flex";
         }
 
         function authHeaders() {
