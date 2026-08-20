@@ -91,6 +91,15 @@ def parse_extras(raw):
         return []
 
 
+def format_order(order_dict):
+    if order_dict.get("estimated_ready_at"):
+        val = order_dict["estimated_ready_at"]
+        if hasattr(val, "isoformat"):
+            order_dict["estimated_ready_at"] = val.isoformat() + "Z"
+    order_dict["extras"] = parse_extras(order_dict.get("extras"))
+    return order_dict
+
+
 def init_db():
     conn = get_connection()
     cur = get_cursor(conn)
@@ -750,12 +759,7 @@ def get_session_orders(session_id: str):
     cur.close()
     conn.close()
 
-    result = []
-    for o in orders:
-        d = dict(o)
-        d["extras"] = parse_extras(d.get("extras"))
-        result.append(d)
-    return result
+    return [format_order(dict(o)) for o in orders]
 
 
 @app.post("/sessions/{session_id}/split")
@@ -879,12 +883,7 @@ def get_pending_orders():
     cur.close()
     conn.close()
 
-    result = []
-    for o in orders:
-        d = dict(o)
-        d["extras"] = parse_extras(d.get("extras"))
-        result.append(d)
-    return result
+    return [format_order(dict(o)) for o in orders]
 
 
 @app.get("/orders/ready")
@@ -896,12 +895,7 @@ def get_ready_orders():
     cur.close()
     conn.close()
 
-    result = []
-    for o in orders:
-        d = dict(o)
-        d["extras"] = parse_extras(d.get("extras"))
-        result.append(d)
-    return result
+    return [format_order(dict(o)) for o in orders]
 
 
 def get_menu_item_row(item: str):
@@ -928,9 +922,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         if existing:
             cur.close()
             conn.close()
-            result = dict(existing)
-            result["extras"] = parse_extras(result.get("extras"))
-            return result
+            return format_order(dict(existing))
 
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
@@ -1044,7 +1036,7 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         "order_id": order_id,
         "status": "APPROVED",
         "kitchen_status": kitchen_status,
-        "estimated_ready_at": estimated_ready_at.isoformat(),
+        "estimated_ready_at": estimated_ready_at.isoformat() + "Z",
     }
 
 
