@@ -305,6 +305,7 @@
         .item-info .name { font-weight: 700; font-size: 15px; }
         .item-info .price { color: #ff6b35; font-weight: 700; font-size: 13px; margin-top: 2px; }
         .item-info .desc { font-size: 12px; color: #999; margin-top: 2px; }
+        .item-info .extras-summary { font-size: 11.5px; color: #7c3aed; margin-top: 3px; }
         .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .add-form {
@@ -347,6 +348,51 @@
             background: #f0f0f0;
             margin-top: 8px;
             display: none;
+        }
+
+        .extras-section {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .extras-label {
+            font-size: 12px;
+            color: #777;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .extra-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .extra-row .extra-name {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1.5px solid #eee;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .extra-row .extra-price {
+            width: 80px;
+            padding: 8px 10px;
+            border: 1.5px solid #eee;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .extra-row button {
+            background: #fce8e6;
+            color: #c0392b;
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+        .add-extra-btn {
+            background: #f0f0f0;
+            color: #555;
+            font-size: 12px;
+            padding: 8px 14px;
         }
 
         .modal-overlay {
@@ -444,6 +490,12 @@
             <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleAddImageFile(this)">
             <img class="image-preview" id="addImagePreview">
 
+            <div class="extras-section">
+                <span class="extras-label" id="itemExtrasLabel">Extras (optional add-ons)</span>
+                <div id="itemExtrasList"></div>
+                <button type="button" class="add-extra-btn" onclick="addExtraRow('itemExtrasList')" id="addItemExtraBtn">+ Add Extra</button>
+            </div>
+
             <br>
             <button class="primary" id="addItemBtn" onclick="addItem()" style="margin-top:10px;">+ Add Item</button>
             <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
@@ -474,6 +526,12 @@
             <input type="file" id="editImageFile" accept="image/*" style="display:none;" onchange="handleEditImageFile(this)">
             <img class="image-preview" id="editImagePreview">
 
+            <div class="extras-section">
+                <span class="extras-label" id="editExtrasLabel">Extras (optional add-ons)</span>
+                <div id="editExtrasList"></div>
+                <button type="button" class="add-extra-btn" onclick="addExtraRow('editExtrasList')" id="addEditExtraBtn">+ Add Extra</button>
+            </div>
+
             <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="primary" id="saveEditBtn" onclick="saveEdit()">Save</button>
                 <button class="secondary" onclick="closeEdit()" id="cancelEditBtn">Cancel</button>
@@ -494,6 +552,30 @@
         function autoGrow(el) {
             el.style.height = "auto";
             el.style.height = el.scrollHeight + "px";
+        }
+
+        function addExtraRow(containerId, name, price) {
+            const container = document.getElementById(containerId);
+            const row = document.createElement("div");
+            row.className = "extra-row";
+            row.innerHTML = `
+                <input type="text" class="extra-name" placeholder="${t('extra_name_placeholder')}" value="${escapeHtml(name || '')}">
+                <input type="number" class="extra-price" placeholder="${t('extra_price_placeholder')}" step="0.01" value="${price !== undefined ? price : ''}">
+                <button type="button" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function collectExtras(containerId) {
+            const rows = document.querySelectorAll(`#${containerId} .extra-row`);
+            const extras = [];
+            rows.forEach(row => {
+                const name = row.querySelector(".extra-name").value.trim();
+                const priceVal = row.querySelector(".extra-price").value;
+                const price = parseFloat(priceVal);
+                if (name && !isNaN(price)) extras.push({ name, price });
+            });
+            return extras;
         }
 
         const T = {
@@ -534,6 +616,10 @@
                 image_url_btn: "Σύνδεσμος Εικόνας",
                 upload_photo_btn: "Ανέβασμα Φωτογραφίας",
                 image_url_placeholder: "Σύνδεσμος εικόνας (προαιρετικό)",
+                extras_label: "Πρόσθετα (προαιρετικά)",
+                add_extra_btn: "+ Προσθήκη Πρόσθετου",
+                extra_name_placeholder: "Όνομα (π.χ. Έξτρα μπιφτέκι)",
+                extra_price_placeholder: "Τιμή",
                 add_item: "+ Προσθήκη Προϊόντος",
                 adding: "Προσθήκη...",
                 added: "Προστέθηκε!",
@@ -565,6 +651,7 @@
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
                 cannot_delete_occupied: "Δεν είναι δυνατή η διαγραφή τραπεζιού με ενεργή συνεδρία — απελευθερώστε το πρώτα.",
+                extras_summary: (list) => `+ ${list}`,
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -621,6 +708,10 @@
                 image_url_btn: "Image URL",
                 upload_photo_btn: "Upload Photo",
                 image_url_placeholder: "Image URL (optional)",
+                extras_label: "Extras (optional add-ons)",
+                add_extra_btn: "+ Add Extra",
+                extra_name_placeholder: "Name (e.g. Extra Patty)",
+                extra_price_placeholder: "Price",
                 add_item: "+ Add Item",
                 adding: "Adding...",
                 added: "Added!",
@@ -652,6 +743,7 @@
                 rename_prompt: "Rename table:",
                 delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
                 cannot_delete_occupied: "Cannot delete a table with an active session — release it first.",
+                extras_summary: (list) => `+ ${list}`,
                 action_labels: {}
             }
         };
@@ -699,6 +791,8 @@
             document.getElementById("addSourceUrl").innerText = t("image_url_btn");
             document.getElementById("addSourceFile").innerText = t("upload_photo_btn");
             document.getElementById("itemImageUrl").placeholder = t("image_url_placeholder");
+            document.getElementById("itemExtrasLabel").innerText = t("extras_label");
+            document.getElementById("addItemExtraBtn").innerText = t("add_extra_btn");
             document.getElementById("addItemBtn").innerHTML = t("add_item");
             document.getElementById("editTitle").innerText = t("edit_item_title");
             document.getElementById("editNameLabel").innerText = t("name_label");
@@ -710,6 +804,8 @@
             document.getElementById("editSourceUrl").innerText = t("image_url_btn");
             document.getElementById("editSourceFile").innerText = t("upload_photo_btn");
             document.getElementById("editImageUrl").placeholder = t("image_url_placeholder");
+            document.getElementById("editExtrasLabel").innerText = t("extras_label");
+            document.getElementById("addEditExtraBtn").innerText = t("add_extra_btn");
             document.getElementById("saveEditBtn").innerText = t("save");
             document.getElementById("cancelEditBtn").innerText = t("cancel");
             if (getWaiterName() !== "Unknown" || getToken()) {
@@ -1118,13 +1214,16 @@
                     let html = "";
                     Object.keys(byCategory).forEach(cat => {
                         html += `<div class="category-heading">${categoryLabel(cat)}</div>`;
-                        html += byCategory[cat].map(item => `
+                        html += byCategory[cat].map(item => {
+                            const extrasList = (item.extras || []).map(e => `${escapeHtml(e.name)} (+€${Number(e.price).toFixed(2)})`).join(", ");
+                            return `
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
                                 <div class="item-info">
                                     <div class="name">${escapeHtml(item.name)} ${item.available ? '' : t("unavailable_suffix")}</div>
                                     <div class="price">€${Number(item.price).toFixed(2)}</div>
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
+                                    ${extrasList ? `<div class="extras-summary">${t("extras_summary", extrasList)}</div>` : ""}
                                 </div>
                                 <div class="item-actions">
                                     <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? t("hide") : t("show")}</button>
@@ -1132,7 +1231,8 @@
                                     <button class="danger" onclick="deleteItem('${item.item_id}')">${t("delete")}</button>
                                 </div>
                             </div>
-                        `).join("");
+                        `;
+                        }).join("");
                     });
 
                     list.innerHTML = html;
@@ -1147,6 +1247,7 @@
             const category = getSelectedCategory("item");
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
+            const extras = collectExtras("itemExtrasList");
 
             if (!id || !name || !price) {
                 document.getElementById("addResult").innerText = t("required_fields");
@@ -1160,7 +1261,7 @@
 
             authFetchJson(`${BASE}/menu-items`, {
                 method: "POST",
-                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category })
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras })
             })
                 .then(r => r ? r.json() : null)
                 .then(data => {
@@ -1181,6 +1282,7 @@
                     document.getElementById("itemImageUrl").value = "";
                     document.getElementById("itemImageFile").value = "";
                     document.getElementById("addImagePreview").style.display = "none";
+                    document.getElementById("itemExtrasList").innerHTML = "";
                     addImageData = "";
                     document.getElementById("addResult").innerText = t("added");
                     loadMenuItems();
@@ -1222,6 +1324,11 @@
             document.getElementById("editImagePreview").style.display = "none";
             document.getElementById("editImageFile").value = "";
             setEditImageSource("url");
+
+            const editExtrasList = document.getElementById("editExtrasList");
+            editExtrasList.innerHTML = "";
+            (item.extras || []).forEach(e => addExtraRow("editExtrasList", e.name, e.price));
+
             document.getElementById("editResult").innerText = "";
             document.getElementById("editOverlay").style.display = "flex";
         }
@@ -1238,8 +1345,9 @@
             const category = getSelectedCategory("edit");
             const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("editImageUrl").value : editImageData;
+            const extras = collectExtras("editExtrasList");
 
-            const payload = { name, price, description: desc, category };
+            const payload = { name, price, description: desc, category, extras };
             if (image) payload.image = image;
 
             const btn = document.getElementById("saveEditBtn");
