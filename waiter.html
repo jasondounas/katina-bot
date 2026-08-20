@@ -53,6 +53,7 @@
         }
         .toast.called { border-left-color: #f39c12; }
         .toast.pay { border-left-color: #7c3aed; }
+        .toast.ready { border-left-color: #1d7d72; }
         .toast .toast-icon { font-size: 22px; }
         .toast .toast-text { flex: 1; }
         .toast .toast-title { font-weight: 800; font-size: 14px; }
@@ -281,6 +282,7 @@
         .card-alert.called { background: #f39c12; }
         .card-alert.pay { background: #7c3aed; }
         .card-alert.pending { background: #ff6b35; }
+        .card-alert.ready { background: #1d7d72; }
         .card-alert.release { background: #999; }
 
         .card-body { padding: 18px; border-top: 5px solid #eee; }
@@ -478,6 +480,7 @@
         let currentAlerts = [];
         let previousAlertKeys = new Set();
         let previousPendingCounts = {};
+        let previousReadyCounts = {};
         let hasLoadedTablesOnce = false;
 
         let audioCtx = null;
@@ -522,6 +525,10 @@
                 calling_waiter: "🔔 ΚΑΛΕΙ ΣΕΡΒΙΤΟΡΟ",
                 wants_to_pay: (m) => `💳 ΘΕΛΕΙ ΝΑ ΠΛΗΡΩΣΕΙ${m ? " — " + m : ""}`,
                 new_orders: (n) => `🧾 ${n} ${n > 1 ? "ΝΕΕΣ ΠΑΡΑΓΓΕΛΕΙΕΣ" : "ΝΕΑ ΠΑΡΑΓΓΕΛΙΑ"}`,
+                order_ready_banner: "✅ ΕΤΟΙΜΟ ΠΡΟΣ ΠΑΡΑΛΑΒΗ",
+                order_ready_alert: (n) => `${n} παραγγελία(ες) έτοιμες προς παραλαβή`,
+                ready_tag: "✅ Έτοιμο",
+                picked_up: "Παρέλαβα",
                 needs_release: "⏹️ ΧΡΕΙΑΖΕΤΑΙ ΑΠΕΛΕΥΘΕΡΩΣΗ",
                 session_status: (s) => `Συνεδρία: ${s}`,
                 cash: "💵 Μετρητά",
@@ -570,6 +577,7 @@
                     "approved order": "ενέκρινε παραγγελία",
                     "rejected order": "απέρριψε παραγγελία",
                     "deleted order": "διέγραψε παραγγελία",
+                    "picked up order": "παρέλαβε παραγγελία",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
@@ -602,6 +610,10 @@
                 calling_waiter: "🔔 CALLING WAITER",
                 wants_to_pay: (m) => `💳 WANTS TO PAY${m ? " — " + m : ""}`,
                 new_orders: (n) => `🧾 ${n} NEW ORDER${n > 1 ? "S" : ""}`,
+                order_ready_banner: "✅ READY FOR PICKUP",
+                order_ready_alert: (n) => `${n} order(s) ready for pickup`,
+                ready_tag: "✅ Ready",
+                picked_up: "Picked Up",
                 needs_release: "⏹️ NEEDS RELEASE",
                 session_status: (s) => `Session ${s}`,
                 cash: "💵 Cash",
@@ -693,8 +705,8 @@
 
         function showToast(alert) {
             const container = document.getElementById("toastContainer");
-            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : "";
-            const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : "🧾";
+            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : alert.type === "ready" ? "ready" : "";
+            const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : toastClass === "ready" ? "✅" : "🧾";
 
             const toast = document.createElement("div");
             toast.className = `toast ${toastClass}`;
@@ -904,7 +916,8 @@
             Promise.all([
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
-            ]).then(([tables, pendingOrders]) => {
+                fetch(`${BASE}/orders/ready`).then(r => r.json()),
+            ]).then(([tables, pendingOrders, readyOrders]) => {
 
                 window._tablesCache = tables;
                 document.getElementById("tableCount").innerText = tables.length;
@@ -912,6 +925,11 @@
                 const pendingCountBySession = {};
                 pendingOrders.forEach(o => {
                     pendingCountBySession[o.session_id] = (pendingCountBySession[o.session_id] || 0) + 1;
+                });
+
+                const readyCountBySession = {};
+                readyOrders.forEach(o => {
+                    readyCountBySession[o.session_id] = (readyCountBySession[o.session_id] || 0) + 1;
                 });
 
                 const sessionFetches = tables
@@ -931,6 +949,7 @@
                     currentAlerts = [];
                     const newOrderEvents = [];
                     const newPendingCounts = {};
+                    const newReadyCounts = {};
                     const grid = document.getElementById("tableGrid");
                     grid.innerHTML = "";
 
@@ -973,11 +992,18 @@
                         }
 
                         const pending = pendingCountBySession[session.session_id] || 0;
+                        const ready = readyCountBySession[session.session_id] || 0;
+
                         const prevPending = previousPendingCounts[session.session_id] || 0;
                         newPendingCounts[session.session_id] = pending;
-
                         if (pending > prevPending && hasLoadedTablesOnce) {
                             newOrderEvents.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
+                        }
+
+                        const prevReady = previousReadyCounts[session.session_id] || 0;
+                        newReadyCounts[session.session_id] = ready;
+                        if (ready > prevReady && hasLoadedTablesOnce) {
+                            newOrderEvents.push({ tableId: tbl.table_id, label, text: t("order_ready_alert", ready), type: "ready" });
                         }
 
                         let bannerClass = "";
@@ -989,8 +1015,13 @@
                             const methodLabel = paymentMethodLabel(session.payment_method);
                             bannerClass = "pay"; bannerText = t("wants_to_pay", methodLabel);
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("requested_bill", methodLabel), type: "pay" });
+                        } else if (ready > 0) {
+                            bannerClass = "ready"; bannerText = t("order_ready_banner");
                         } else if (pending > 0) {
                             bannerClass = "pending"; bannerText = t("new_orders", pending);
+                        }
+                        if (ready > 0) {
+                            currentAlerts.push({ tableId: tbl.table_id, label, text: t("order_ready_alert", ready), type: "ready" });
                         }
                         if (pending > 0) {
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
@@ -1019,9 +1050,10 @@
                     });
 
                     previousPendingCounts = newPendingCounts;
+                    previousReadyCounts = newReadyCounts;
 
                     const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
-                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && !previousAlertKeys.has(`${a.tableId}-${a.type}`));
+                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && a.type !== "ready" && !previousAlertKeys.has(`${a.tableId}-${a.type}`));
                     const allTriggerEvents = newStatusAlerts.concat(newOrderEvents);
 
                     if (allTriggerEvents.length > 0 && hasLoadedTablesOnce) {
@@ -1141,19 +1173,32 @@
                                     let ordersHtml = orders.length
                                         ? orders.map(o => {
                                             const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
+
+                                            let actionsHtml;
+                                            if (o.status === "PENDING_REVIEW") {
+                                                actionsHtml = `
+                                                    <button class="success" onclick="approveOrder('${o.order_id}')">${t("accept")}</button>
+                                                    <button class="danger" onclick="rejectOrder('${o.order_id}')">${t("reject")}</button>
+                                                `;
+                                            } else if (o.status === "APPROVED" && o.ready) {
+                                                actionsHtml = `<button class="success" onclick="pickedUp('${o.order_id}')">${t("picked_up")}</button>`;
+                                            } else {
+                                                actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
+                                            }
+
+                                            const readyTag = (o.status === "APPROVED" && o.ready)
+                                                ? `<div style="font-size:11.5px; color:#1d7d72; font-weight:700; margin-top:2px;">${t("ready_tag")}</div>`
+                                                : "";
+
                                             return `
                                             <div class="order-line">
                                                 <div class="info">
                                                     ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
+                                                    ${readyTag}
                                                     ${extrasList ? `<div style="font-size:11.5px; color:#1d5fd7; margin-top:2px; white-space:normal;">+ ${extrasList}</div>` : ""}
                                                     ${o.note ? `<div style="font-size:11.5px; color:#7c3aed; font-style:italic; margin-top:2px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
                                                 </div>
-                                                <div class="actions">
-                                                    ${o.status === "PENDING_REVIEW" ? `
-                                                        <button class="success" onclick="approveOrder('${o.order_id}')">${t("accept")}</button>
-                                                        <button class="danger" onclick="rejectOrder('${o.order_id}')">${t("reject")}</button>
-                                                    ` : `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`}
-                                                </div>
+                                                <div class="actions">${actionsHtml}</div>
                                             </div>
                                         `;
                                         }).join("")
@@ -1286,6 +1331,22 @@
 
         function rejectOrder(orderId) {
             authFetch(`${BASE}/orders/${orderId}/reject`, {
+                method: "POST"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
+                });
+        }
+
+        function pickedUp(orderId) {
+            authFetch(`${BASE}/orders/${orderId}/picked-up`, {
                 method: "POST"
             })
                 .then(r => r ? r.json() : null)
