@@ -277,6 +277,7 @@
         }
         .order-status .item-name { font-weight: 700; font-size: 15px; }
         .order-status .item-note { font-size: 12px; color: #999; font-style: italic; margin-top: 2px; }
+        .order-status .item-extras { font-size: 12px; color: #7c3aed; margin-top: 2px; }
         .pill { font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 20px; flex-shrink: 0; margin-left: 10px; }
         .pill.PENDING_REVIEW { background: #fff4e6; color: #b9770e; }
         .pill.APPROVED { background: #e6f5f3; color: #1d7d72; }
@@ -364,6 +365,25 @@
         .note-input:focus {
             outline: none;
             border-color: #ff6b35;
+        }
+        .extras-picker {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .extra-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #555;
+            cursor: pointer;
+        }
+        .extra-option input {
+            width: 16px;
+            height: 16px;
+            accent-color: #ff6b35;
         }
         .cart-total-row {
             display: none;
@@ -482,6 +502,7 @@
         let menu = {};
         let cart = {};
         let cartNotes = {};
+        let cartExtras = {};
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -593,9 +614,24 @@
             const data = menu[item];
             return (typeof data === "object" && data.category) ? data.category : "other";
         }
+        function getExtras(item) {
+            const data = menu[item];
+            return (typeof data === "object" && Array.isArray(data.extras)) ? data.extras : [];
+        }
+        function getExtraPrice(item, extraName) {
+            const found = getExtras(item).find(e => e.name === extraName);
+            return found ? Number(found.price) : 0;
+        }
+
+        function calcItemUnitPrice(item) {
+            const base = Number(getPrice(item));
+            const selected = cartExtras[item] || [];
+            const extrasTotal = selected.reduce((sum, name) => sum + getExtraPrice(item, name), 0);
+            return base + extrasTotal;
+        }
 
         function calcCartTotal() {
-            return Object.keys(cart).reduce((sum, item) => sum + (Number(getPrice(item)) * cart[item]), 0);
+            return Object.keys(cart).reduce((sum, item) => sum + calcItemUnitPrice(item) * cart[item], 0);
         }
 
         function generateIdempotencyKey() {
@@ -779,6 +815,7 @@
             if (cart[item] <= 0) {
                 delete cart[item];
                 delete cartNotes[item];
+                delete cartExtras[item];
             }
             updateCartBar();
             updateItemBadges();
@@ -787,6 +824,17 @@
 
         function updateNote(item, value) {
             cartNotes[item] = value;
+        }
+
+        function toggleCartExtra(item, name, checked) {
+            if (!cartExtras[item]) cartExtras[item] = [];
+            if (checked) {
+                if (!cartExtras[item].includes(name)) cartExtras[item].push(name);
+            } else {
+                cartExtras[item] = cartExtras[item].filter(n => n !== name);
+            }
+            updateCartBar();
+            renderCartSheet();
         }
 
         function updateItemBadges() {
@@ -843,7 +891,20 @@
             const div = document.getElementById("cartLines");
             const items = Object.keys(cart);
             div.innerHTML = items.length
-                ? items.map(item => `
+                ? items.map(item => {
+                    const availableExtras = getExtras(item);
+                    const extrasHtml = availableExtras.length ? `
+                        <div class="extras-picker">
+                            ${availableExtras.map(e => {
+                                const checked = (cartExtras[item] || []).includes(e.name) ? "checked" : "";
+                                return `<label class="extra-option">
+                                    <input type="checkbox" ${checked} onchange="toggleCartExtra('${item}', '${escapeHtml(e.name)}', this.checked)">
+                                    ${escapeHtml(e.name)} (+€${Number(e.price).toFixed(2)})
+                                </label>`;
+                            }).join("")}
+                        </div>
+                    ` : "";
+                    return `
                     <div class="cart-line">
                         <div class="cart-line-top">
                             <span class="item-name">${escapeHtml(capitalize(item))}</span>
@@ -853,11 +914,13 @@
                                 <button onclick="changeQty('${item}', 1)">+</button>
                             </span>
                         </div>
+                        ${extrasHtml}
                         <input type="text" class="note-input" placeholder="${t("note_placeholder")}"
                                value="${escapeHtml(cartNotes[item] || '')}"
                                oninput="updateNote('${item}', this.value)">
                     </div>
-                `).join("")
+                `;
+                }).join("")
                 : `<p style='color:#999; padding:24px 0;'>${t("cart_empty")}</p>`;
 
             const totalRow = document.getElementById("cartTotalRow");
@@ -880,13 +943,15 @@
             const requests = items.map(item => {
                 const key = generateIdempotencyKey();
                 const note = encodeURIComponent(cartNotes[item] || "");
-                return fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}&idempotency_key=${key}&note=${note}`, { method: "POST" })
+                const extras = encodeURIComponent(JSON.stringify(cartExtras[item] || []));
+                return fetch(`${BASE}/orders?session_id=${sessionId}&item=${item}&qty=${cart[item]}&idempotency_key=${key}&note=${note}&extras=${extras}`, { method: "POST" })
                     .then(r => r.json());
             });
 
             Promise.all(requests).then(() => {
                 cart = {};
                 cartNotes = {};
+                cartExtras = {};
                 updateCartBar();
                 updateItemBadges();
                 closeCartSheet();
@@ -923,15 +988,19 @@
                     }
 
                     div.innerHTML = orders.length
-                        ? orders.map(o => `
+                        ? orders.map(o => {
+                            const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
+                            return `
                             <div class="order-status">
                                 <div>
                                     <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
+                                    ${extrasList ? `<div class="item-extras">+ ${extrasList}</div>` : ""}
                                     ${o.note ? `<div class="item-note">💬 ${escapeHtml(o.note)}</div>` : ""}
                                 </div>
                                 <span class="pill ${o.status}">${t("status_labels")[o.status] || o.status}</span>
                             </div>
-                        `).join("")
+                        `;
+                        }).join("")
                         : `<p class='empty-orders'>${t("no_orders")}</p>`;
                 });
         }
