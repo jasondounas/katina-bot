@@ -306,6 +306,7 @@
         .item-info .price { color: #ff6b35; font-weight: 700; font-size: 13px; margin-top: 2px; }
         .item-info .desc { font-size: 12px; color: #999; margin-top: 2px; }
         .item-info .extras-summary { font-size: 11.5px; color: #7c3aed; margin-top: 3px; }
+        .item-info .prep-time-summary { font-size: 11.5px; color: #1d7d72; margin-top: 3px; }
         .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .add-form {
@@ -323,6 +324,7 @@
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
+        #itemPrepTime { width: 90px; }
         #itemCategoryNew { width: 160px; }
         #newTableId, #newTableLabel { width: 160px; }
 
@@ -477,6 +479,7 @@
                 <input type="text" id="itemId" placeholder="id (e.g. fries)">
                 <input type="text" id="itemName" placeholder="Name">
                 <input type="number" id="itemPrice" placeholder="Price" step="0.01">
+                <input type="number" id="itemPrepTime" placeholder="Prep time (min)" step="1" min="1" value="10">
                 <textarea id="itemDesc" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
                 <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
                 <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
@@ -511,6 +514,8 @@
             <input type="text" id="editName">
             <label id="editPriceLabel">Price</label>
             <input type="number" id="editPrice" step="0.01">
+            <label id="editPrepTimeLabel">Prep time (minutes)</label>
+            <input type="number" id="editPrepTime" step="1" min="1">
             <label id="editDescLabel">Description</label>
             <textarea id="editDesc" oninput="autoGrow(this)"></textarea>
             <label id="editCategoryLabel">Category</label>
@@ -611,6 +616,7 @@
                 id_placeholder: "id (π.χ. fries)",
                 name_field_placeholder: "Όνομα",
                 price_placeholder: "Τιμή",
+                prep_time_placeholder: "Χρόνος (λεπτά)",
                 desc_placeholder: "Περιγραφή",
                 new_category_placeholder: "Όνομα νέας κατηγορίας",
                 image_url_btn: "Σύνδεσμος Εικόνας",
@@ -620,6 +626,8 @@
                 add_extra_btn: "+ Προσθήκη Πρόσθετου",
                 extra_name_placeholder: "Όνομα (π.χ. Έξτρα μπιφτέκι)",
                 extra_price_placeholder: "Τιμή",
+                edit_prep_time_label: "Χρόνος προετοιμασίας (λεπτά)",
+                prep_time_summary: (n) => `⏱️ ~${n} λεπτά προετοιμασία`,
                 add_item: "+ Προσθήκη Προϊόντος",
                 adding: "Προσθήκη...",
                 added: "Προστέθηκε!",
@@ -665,6 +673,7 @@
                     "approved order": "ενέκρινε παραγγελία",
                     "rejected order": "απέρριψε παραγγελία",
                     "deleted order": "διέγραψε παραγγελία",
+                    "picked up order": "παρέλαβε παραγγελία",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
@@ -703,6 +712,7 @@
                 id_placeholder: "id (e.g. fries)",
                 name_field_placeholder: "Name",
                 price_placeholder: "Price",
+                prep_time_placeholder: "Prep time (min)",
                 desc_placeholder: "Description",
                 new_category_placeholder: "New category name",
                 image_url_btn: "Image URL",
@@ -712,6 +722,8 @@
                 add_extra_btn: "+ Add Extra",
                 extra_name_placeholder: "Name (e.g. Extra Patty)",
                 extra_price_placeholder: "Price",
+                edit_prep_time_label: "Prep time (minutes)",
+                prep_time_summary: (n) => `⏱️ ~${n} min prep time`,
                 add_item: "+ Add Item",
                 adding: "Adding...",
                 added: "Added!",
@@ -786,6 +798,7 @@
             document.getElementById("itemId").placeholder = t("id_placeholder");
             document.getElementById("itemName").placeholder = t("name_field_placeholder");
             document.getElementById("itemPrice").placeholder = t("price_placeholder");
+            document.getElementById("itemPrepTime").placeholder = t("prep_time_placeholder");
             document.getElementById("itemDesc").placeholder = t("desc_placeholder");
             document.getElementById("itemCategoryNew").placeholder = t("new_category_placeholder");
             document.getElementById("addSourceUrl").innerText = t("image_url_btn");
@@ -797,6 +810,7 @@
             document.getElementById("editTitle").innerText = t("edit_item_title");
             document.getElementById("editNameLabel").innerText = t("name_label");
             document.getElementById("editPriceLabel").innerText = t("price_label");
+            document.getElementById("editPrepTimeLabel").innerText = t("edit_prep_time_label");
             document.getElementById("editDescLabel").innerText = t("desc_label");
             document.getElementById("editCategoryLabel").innerText = t("category_label");
             document.getElementById("editImageLabel").innerText = t("image_label");
@@ -1216,6 +1230,7 @@
                         html += `<div class="category-heading">${categoryLabel(cat)}</div>`;
                         html += byCategory[cat].map(item => {
                             const extrasList = (item.extras || []).map(e => `${escapeHtml(e.name)} (+€${Number(e.price).toFixed(2)})`).join(", ");
+                            const prepTime = item.prep_time_minutes || 10;
                             return `
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
@@ -1223,6 +1238,7 @@
                                     <div class="name">${escapeHtml(item.name)} ${item.available ? '' : t("unavailable_suffix")}</div>
                                     <div class="price">€${Number(item.price).toFixed(2)}</div>
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
+                                    <div class="prep-time-summary">${t("prep_time_summary", prepTime)}</div>
                                     ${extrasList ? `<div class="extras-summary">${t("extras_summary", extrasList)}</div>` : ""}
                                 </div>
                                 <div class="item-actions">
@@ -1243,6 +1259,8 @@
             const id = document.getElementById("itemId").value.trim();
             const name = document.getElementById("itemName").value.trim();
             const price = parseFloat(document.getElementById("itemPrice").value);
+            const prepTimeVal = parseInt(document.getElementById("itemPrepTime").value, 10);
+            const prepTime = isNaN(prepTimeVal) || prepTimeVal < 1 ? 10 : prepTimeVal;
             const desc = document.getElementById("itemDesc").value;
             const category = getSelectedCategory("item");
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
@@ -1261,7 +1279,7 @@
 
             authFetchJson(`${BASE}/menu-items`, {
                 method: "POST",
-                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras })
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras, prep_time_minutes: prepTime })
             })
                 .then(r => r ? r.json() : null)
                 .then(data => {
@@ -1275,6 +1293,7 @@
                     document.getElementById("itemId").value = "";
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
+                    document.getElementById("itemPrepTime").value = "10";
                     document.getElementById("itemDesc").value = "";
                     document.getElementById("itemDesc").style.height = "auto";
                     document.getElementById("itemCategoryNew").value = "";
@@ -1315,6 +1334,7 @@
             editImageData = "";
             document.getElementById("editName").value = item.name;
             document.getElementById("editPrice").value = item.price;
+            document.getElementById("editPrepTime").value = item.prep_time_minutes || 10;
             document.getElementById("editDesc").value = item.description || "";
             autoGrow(document.getElementById("editDesc"));
             document.getElementById("editCategory").value = item.category || "other";
@@ -1341,13 +1361,15 @@
         function saveEdit() {
             const name = document.getElementById("editName").value;
             const price = parseFloat(document.getElementById("editPrice").value);
+            const prepTimeVal = parseInt(document.getElementById("editPrepTime").value, 10);
+            const prepTime = isNaN(prepTimeVal) || prepTimeVal < 1 ? 10 : prepTimeVal;
             const desc = document.getElementById("editDesc").value;
             const category = getSelectedCategory("edit");
             const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("editImageUrl").value : editImageData;
             const extras = collectExtras("editExtrasList");
 
-            const payload = { name, price, description: desc, category, extras };
+            const payload = { name, price, description: desc, category, extras, prep_time_minutes: prepTime };
             if (image) payload.image = image;
 
             const btn = document.getElementById("saveEditBtn");
