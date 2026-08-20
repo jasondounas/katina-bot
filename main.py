@@ -2,6 +2,7 @@ from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime, timedelta
 import uuid
 import os
 import json
@@ -23,6 +24,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 WAITER_TOKEN = os.environ.get("WAITER_TOKEN", "changeme")
 
+QUEUE_DELAY_MINUTES_PER_ORDER = 2
+
 
 class MenuItemExtra(BaseModel):
     name: str
@@ -37,6 +40,7 @@ class MenuItemCreate(BaseModel):
     image: str = ""
     category: str = "other"
     extras: List[MenuItemExtra] = []
+    prep_time_minutes: int = 10
 
 
 class MenuItemUpdate(BaseModel):
@@ -47,6 +51,7 @@ class MenuItemUpdate(BaseModel):
     available: int = None
     category: str = None
     extras: Optional[List[MenuItemExtra]] = None
+    prep_time_minutes: int = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -182,6 +187,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN estimated_ready_at TIMESTAMP")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -189,6 +200,12 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN extras TEXT DEFAULT '[]'")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN prep_time_minutes INTEGER DEFAULT 10")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
         conn.rollback()
@@ -248,6 +265,7 @@ def get_menu():
             "image": item["image"],
             "category": item["category"] or "other",
             "extras": parse_extras(item.get("extras")),
+            "prep_time_minutes": item.get("prep_time_minutes") or 10,
         }
     return menu
 
@@ -299,8 +317,8 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
     extras_json = json.dumps([e.dict() for e in payload.extras])
 
     cur.execute(
-        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras) VALUES (%s, %s, %s, %s, %s, 1, %s, %s)",
-        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json),
+        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras, prep_time_minutes) VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s)",
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json, payload.prep_time_minutes),
     )
     conn.commit()
     cur.close()
@@ -343,7 +361,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
     extras_json = json.dumps([e.dict() for e in payload.extras]) if payload.extras is not None else item["extras"]
 
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, prep_time_minutes=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
@@ -352,6 +370,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
             payload.available if payload.available is not None else item["available"],
             payload.category if payload.category is not None else item["category"],
             extras_json,
+            payload.prep_time_minutes if payload.prep_time_minutes is not None else item.get("prep_time_minutes", 10),
             item_id,
         ),
     )
@@ -1002,7 +1021,19 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
 
     kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text)
 
-    cur.execute("UPDATE orders SET status = %s, handled_by = %s WHERE order_id = %s", ("APPROVED", waiter_name, order_id))
+    menu_row = get_menu_item_row(order["item"])
+    prep_time = menu_row["prep_time_minutes"] if menu_row and menu_row.get("prep_time_minutes") else 10
+
+    cur.execute("SELECT COUNT(*) as cnt FROM orders WHERE status = 'APPROVED' AND ready = 0")
+    queue_ahead = cur.fetchone()["cnt"]
+
+    eta_minutes = prep_time + (queue_ahead * QUEUE_DELAY_MINUTES_PER_ORDER)
+    estimated_ready_at = datetime.utcnow() + timedelta(minutes=eta_minutes)
+
+    cur.execute(
+        "UPDATE orders SET status = %s, handled_by = %s, estimated_ready_at = %s WHERE order_id = %s",
+        ("APPROVED", waiter_name, estimated_ready_at, order_id),
+    )
     conn.commit()
     cur.close()
     conn.close()
@@ -1013,6 +1044,7 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         "order_id": order_id,
         "status": "APPROVED",
         "kitchen_status": kitchen_status,
+        "estimated_ready_at": estimated_ready_at.isoformat(),
     }
 
 
