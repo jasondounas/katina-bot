@@ -43,6 +43,10 @@
             cursor: pointer;
             font-size: 14px;
         }
+        button:disabled {
+            background: #555;
+            cursor: default;
+        }
     </style>
 </head>
 <body>
@@ -51,6 +55,7 @@
 
     <script>
        const PDA = "https://katina-bot-1.onrender.com";
+       const BASE = "https://katina-bot.onrender.com";
        let previousTicketCount = 0;
 
        function playNotificationSound() {
@@ -97,16 +102,20 @@
                                 <p>Order #${t.order_id}</p>
                                 ${t.extras ? `<div class="extras">+ ${escapeHtml(t.extras)}</div>` : ""}
                                 ${t.note ? `<div class="note">💬 ${escapeHtml(t.note)}</div>` : ""}
-                                <button onclick="markDone('${t.order_id}')">✅ Ready</button>
+                                <button onclick="markDone('${t.order_id}', this)">✅ Ready</button>
                             </div>
                         `).join("")
                         : "<p style='color:#888;'>No active tickets.</p>";
                 });
         }
 
-        function markDone(orderId) {
+        function markDone(orderId, btn) {
+            btn.disabled = true;
+            btn.innerText = "...";
             fetch(`${PDA}/kitchen-tickets/${orderId}/done`, { method: "POST" })
-                .then(() => loadTickets());
+                .then(() => fetch(`${BASE}/orders/${orderId}/ready`, { method: "POST" }))
+                .then(() => loadTickets())
+                .catch(() => loadTickets());
         }
 
         loadTickets();
