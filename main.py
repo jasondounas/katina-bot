@@ -176,6 +176,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN ready INTEGER DEFAULT 0")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -862,6 +868,23 @@ def get_pending_orders():
     return result
 
 
+@app.get("/orders/ready")
+def get_ready_orders():
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE status = 'APPROVED' AND ready = 1")
+    orders = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    result = []
+    for o in orders:
+        d = dict(o)
+        d["extras"] = parse_extras(d.get("extras"))
+        result.append(d)
+    return result
+
+
 def get_menu_item_row(item: str):
     conn = get_connection()
     cur = get_cursor(conn)
@@ -921,7 +944,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note, extras) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note, extras, ready) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0)",
         (order_id, session_id, item, qty, unit_price, "PENDING_REVIEW", idempotency_key, note, json.dumps(extras_detail)),
     )
     conn.commit()
@@ -1018,6 +1041,48 @@ def reject_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_nam
     log_action(waiter_name, "rejected order", order_id)
 
     return {"order_id": order_id, "status": "REJECTED"}
+
+
+@app.post("/orders/{order_id}/ready")
+def mark_order_ready(order_id: str):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
+
+    if order is None:
+        cur.close()
+        conn.close()
+        return {"error": "Order not found"}
+
+    cur.execute("UPDATE orders SET ready = 1 WHERE order_id = %s", (order_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"order_id": order_id, "ready": True}
+
+
+@app.post("/orders/{order_id}/picked-up")
+def mark_order_picked_up(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
+
+    if order is None:
+        cur.close()
+        conn.close()
+        return {"error": "Order not found"}
+
+    cur.execute("UPDATE orders SET ready = 0 WHERE order_id = %s", (order_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "picked up order", order_id)
+
+    return {"order_id": order_id, "ready": False}
 
 
 @app.delete("/orders/{order_id}")
