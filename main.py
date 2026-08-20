@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List, Optional
 import uuid
 import os
+import json
 import psycopg2
 import psycopg2.extras
 import httpx
@@ -22,6 +24,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 WAITER_TOKEN = os.environ.get("WAITER_TOKEN", "changeme")
 
 
+class MenuItemExtra(BaseModel):
+    name: str
+    price: float
+
+
 class MenuItemCreate(BaseModel):
     item_id: str
     name: str
@@ -29,6 +36,7 @@ class MenuItemCreate(BaseModel):
     description: str = ""
     image: str = ""
     category: str = "other"
+    extras: List[MenuItemExtra] = []
 
 
 class MenuItemUpdate(BaseModel):
@@ -38,6 +46,7 @@ class MenuItemUpdate(BaseModel):
     image: str = None
     available: int = None
     category: str = None
+    extras: Optional[List[MenuItemExtra]] = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -68,6 +77,13 @@ def log_action(waiter_name: str, action: str, target_id: str):
     conn.commit()
     cur.close()
     conn.close()
+
+
+def parse_extras(raw):
+    try:
+        return json.loads(raw) if raw else []
+    except Exception:
+        return []
 
 
 def init_db():
@@ -154,7 +170,19 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN extras TEXT DEFAULT '[]'")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN extras TEXT DEFAULT '[]'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
         conn.rollback()
@@ -213,6 +241,7 @@ def get_menu():
             "description": item["description"],
             "image": item["image"],
             "category": item["category"] or "other",
+            "extras": parse_extras(item.get("extras")),
         }
     return menu
 
@@ -261,9 +290,11 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
         conn.close()
         return {"error": "Item already exists"}
 
+    extras_json = json.dumps([e.dict() for e in payload.extras])
+
     cur.execute(
-        "INSERT INTO menu_items (item_id, name, price, description, image, available, category) VALUES (%s, %s, %s, %s, %s, 1, %s)",
-        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category),
+        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras) VALUES (%s, %s, %s, %s, %s, 1, %s, %s)",
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json),
     )
     conn.commit()
     cur.close()
@@ -282,7 +313,13 @@ def list_menu_items():
     items = cur.fetchall()
     cur.close()
     conn.close()
-    return [dict(i) for i in items]
+
+    result = []
+    for i in items:
+        d = dict(i)
+        d["extras"] = parse_extras(d.get("extras"))
+        result.append(d)
+    return result
 
 
 @app.post("/menu-items/{item_id}/update")
@@ -297,8 +334,10 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
         conn.close()
         return {"error": "Item not found"}
 
+    extras_json = json.dumps([e.dict() for e in payload.extras]) if payload.extras is not None else item["extras"]
+
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
@@ -306,6 +345,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
             payload.image if payload.image is not None else item["image"],
             payload.available if payload.available is not None else item["available"],
             payload.category if payload.category is not None else item["category"],
+            extras_json,
             item_id,
         ),
     )
@@ -685,7 +725,12 @@ def get_session_orders(session_id: str):
     cur.close()
     conn.close()
 
-    return [dict(order) for order in orders]
+    result = []
+    for o in orders:
+        d = dict(o)
+        d["extras"] = parse_extras(d.get("extras"))
+        result.append(d)
+    return result
 
 
 @app.post("/sessions/{session_id}/split")
@@ -809,21 +854,26 @@ def get_pending_orders():
     cur.close()
     conn.close()
 
-    return [dict(order) for order in orders]
+    result = []
+    for o in orders:
+        d = dict(o)
+        d["extras"] = parse_extras(d.get("extras"))
+        result.append(d)
+    return result
 
 
-def get_price_from_db(item: str) -> float:
+def get_menu_item_row(item: str):
     conn = get_connection()
     cur = get_cursor(conn)
-    cur.execute("SELECT price FROM menu_items WHERE item_id = %s AND available = 1", (item,))
+    cur.execute("SELECT * FROM menu_items WHERE item_id = %s AND available = 1", (item,))
     row = cur.fetchone()
     cur.close()
     conn.close()
-    return row["price"] if row else 0
+    return row
 
 
 @app.post("/orders")
-def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None, note: str = ""):
+def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = None, note: str = "", extras: str = "[]"):
     if qty < 1:
         return {"error": "Quantity must be at least 1"}
 
@@ -836,7 +886,9 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         if existing:
             cur.close()
             conn.close()
-            return dict(existing)
+            result = dict(existing)
+            result["extras"] = parse_extras(result.get("extras"))
+            return result
 
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
@@ -846,12 +898,31 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         conn.close()
         return {"error": "Session not found"}
 
-    price = get_price_from_db(item)
+    menu_row = get_menu_item_row(item)
+    base_price = menu_row["price"] if menu_row else 0
+    available_extras = parse_extras(menu_row["extras"]) if menu_row else []
+
+    try:
+        requested_extra_names = json.loads(extras)
+        if not isinstance(requested_extra_names, list):
+            requested_extra_names = []
+    except Exception:
+        requested_extra_names = []
+
+    extras_detail = []
+    extras_total = 0.0
+    for name in requested_extra_names:
+        match = next((e for e in available_extras if e.get("name") == name), None)
+        if match:
+            extras_detail.append(match)
+            extras_total += float(match.get("price", 0))
+
+    unit_price = base_price + extras_total
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (order_id, session_id, item, qty, price, "PENDING_REVIEW", idempotency_key, note),
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note, extras) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (order_id, session_id, item, qty, unit_price, "PENDING_REVIEW", idempotency_key, note, json.dumps(extras_detail)),
     )
     conn.commit()
     cur.close()
@@ -862,18 +933,19 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
         "session_id": session_id,
         "item": item,
         "qty": qty,
-        "price": price,
+        "price": unit_price,
         "status": "PENDING_REVIEW",
         "note": note,
+        "extras": extras_detail,
     }
 
 
-def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "") -> str:
+def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "") -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
                 f"{PDA_URL}/kitchen-ticket",
-                params={"order_id": order_id, "item": item, "qty": qty, "note": note},
+                params={"order_id": order_id, "item": item, "qty": qty, "note": note, "extras": extras},
                 timeout=5.0,
             )
             if response.status_code == 200:
@@ -902,7 +974,10 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         conn.close()
         return {"error": "Order already processed"}
 
-    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "")
+    extras_list = parse_extras(order.get("extras"))
+    extras_text = ", ".join(e.get("name", "") for e in extras_list)
+
+    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text)
 
     cur.execute("UPDATE orders SET status = %s, handled_by = %s WHERE order_id = %s", ("APPROVED", waiter_name, order_id))
     conn.commit()
