@@ -77,16 +77,46 @@
         .hero .tagline { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
         .hero .tagline-sub { font-size: 13px; color: #b8e8e2; font-weight: 500; }
 
-        .category-tabs {
+        .menu-toolbar {
             position: sticky;
             top: 0;
             z-index: 15;
             background: #f7f5f2;
-            padding: 14px 24px;
+            padding: 14px 24px 0;
+        }
+        .search-bar {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            border: none;
+            border-radius: 16px;
+            background: white;
+            font-size: 14px;
+            font-family: inherit;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .search-bar input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #ff6b35;
+        }
+        .search-bar .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 15px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .category-tabs {
             display: flex;
             gap: 10px;
             overflow-x: auto;
             scrollbar-width: none;
+            padding-bottom: 14px;
         }
         .category-tabs::-webkit-scrollbar { display: none; }
         .category-tab {
@@ -142,7 +172,7 @@
             font-size: 24px; font-weight: 800;
             margin: 32px 0 18px;
             letter-spacing: -0.5px;
-            scroll-margin-top: 70px;
+            scroll-margin-top: 100px;
         }
         .container > .section-title:first-child {
             margin-top: 4px;
@@ -458,7 +488,13 @@
         </div>
     </div>
 
-    <div class="category-tabs" id="categoryTabs"></div>
+    <div class="menu-toolbar">
+        <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search menu..." oninput="handleSearchInput(this.value)">
+        </div>
+        <div class="category-tabs" id="categoryTabs"></div>
+    </div>
 
     <button class="quick-call-btn" onclick="scrollToActions()">🔔</button>
 
@@ -503,6 +539,7 @@
         let cart = {};
         let cartNotes = {};
         let cartExtras = {};
+        let searchTerm = "";
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -517,6 +554,9 @@
                 empty_menu: "Το μενού είναι άδειο αυτή τη στιγμή.",
                 tagline: "Τι λαχταράτε σήμερα;",
                 tagline_sub: "Φρέσκες επιλογές, φτιαγμένες κατά παραγγελία, στο τραπέζι σας",
+                search_placeholder: "Αναζήτηση στο μενού...",
+                search_results_heading: "Αποτελέσματα Αναζήτησης",
+                no_search_results: "Δεν βρέθηκαν προϊόντα.",
                 call_waiter_btn: "🔔 Κλήση Σερβιτόρου",
                 waiter_notified: "🔔 Ο σερβιτόρος ειδοποιήθηκε",
                 request_bill_btn: "💳 Πληρωμή",
@@ -546,6 +586,9 @@
                 empty_menu: "The menu is empty right now.",
                 tagline: "What are you craving today?",
                 tagline_sub: "Fresh picks, made to order, straight to your table",
+                search_placeholder: "Search menu...",
+                search_results_heading: "Search Results",
+                no_search_results: "No items found.",
                 call_waiter_btn: "🔔 Call Waiter",
                 waiter_notified: "🔔 Waiter notified",
                 request_bill_btn: "💳 Request the Bill",
@@ -587,6 +630,7 @@
             document.getElementById("cartTitle").innerText = t("your_cart");
             document.getElementById("submitBtn").innerText = t("send_order");
             document.getElementById("cartTotalLabel").innerText = t("cart_total_label");
+            document.getElementById("searchInput").placeholder = t("search_placeholder");
             if (!tableId) {
                 document.getElementById("tableLabel").innerText = t("no_table_linked");
             } else if (document.getElementById("tableLabel").dataset.hasTable) {
@@ -731,12 +775,56 @@
             document.getElementById("actionButtonsSection").scrollIntoView({ behavior: "smooth", block: "center" });
         }
 
+        function handleSearchInput(value) {
+            searchTerm = value.trim().toLowerCase();
+            renderMenu();
+        }
+
+        function buildActionsAndOrdersHtml() {
+            return `
+                <div class="action-buttons" id="actionButtonsSection">
+                    <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("call_waiter_btn")}</button>
+                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">${t("request_bill_btn")}</button>
+                </div>
+                <div class="section-title orders"><span class="bar"></span>${t("your_orders")}</div>
+                <div class="bill-total" id="billTotalBox" style="display:none;">
+                    <span class="label">${t("bill_so_far")}</span>
+                    <span class="amount" id="billTotalAmount">€0.00</span>
+                </div>
+                <div id="ordersList"><p class="empty-orders">${t("no_orders")}</p></div>
+            `;
+        }
+
         function renderMenu() {
             const app = document.getElementById("app");
             const items = Object.keys(menu);
 
             if (items.length === 0) {
                 app.innerHTML = `<div class="missing-session">${t("empty_menu")}</div>`;
+                document.getElementById("categoryTabs").innerHTML = "";
+                return;
+            }
+
+            if (searchTerm) {
+                document.getElementById("categoryTabs").innerHTML = "";
+
+                const filtered = items.filter(item => {
+                    const name = capitalize(item).toLowerCase();
+                    const desc = (getDescription(item) || "").toLowerCase();
+                    return name.includes(searchTerm) || desc.includes(searchTerm);
+                });
+
+                const itemsHtml = filtered.length
+                    ? filtered.map(buildItemHtml).join("")
+                    : `<p class="empty-orders">${t("no_search_results")}</p>`;
+
+                app.innerHTML = `
+                    <div class="section-title category"><span class="bar"></span>${t("search_results_heading")}</div>
+                    <div class="menu-grid">${itemsHtml}</div>
+                    ${buildActionsAndOrdersHtml()}
+                `;
+                updateItemBadges();
+                loadMyOrders();
                 return;
             }
 
@@ -770,16 +858,7 @@
 
             app.innerHTML = `
                 ${categoriesHtml}
-                <div class="action-buttons" id="actionButtonsSection">
-                    <button class="call-btn" id="callBtn" onclick="callWaiter()">${t("call_waiter_btn")}</button>
-                    <button class="pay-btn" id="payBtn" onclick="requestPayment()">${t("request_bill_btn")}</button>
-                </div>
-                <div class="section-title orders"><span class="bar"></span>${t("your_orders")}</div>
-                <div class="bill-total" id="billTotalBox" style="display:none;">
-                    <span class="label">${t("bill_so_far")}</span>
-                    <span class="amount" id="billTotalAmount">€0.00</span>
-                </div>
-                <div id="ordersList"><p class="empty-orders">${t("no_orders")}</p></div>
+                ${buildActionsAndOrdersHtml()}
             `;
             updateItemBadges();
         }
