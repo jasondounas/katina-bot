@@ -1016,7 +1016,12 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
     menu_row = get_menu_item_row(order["item"])
     prep_time = menu_row["prep_time_minutes"] if menu_row and menu_row.get("prep_time_minutes") else 10
 
-    cur.execute("SELECT COUNT(*) as cnt FROM orders WHERE status = 'APPROVED' AND ready = 0")
+    cur.execute("""
+        SELECT COUNT(*) as cnt
+        FROM orders o
+        JOIN sessions s ON o.session_id = s.session_id
+        WHERE o.status = 'APPROVED' AND o.ready = 0 AND s.status = 'OPEN'
+    """)
     queue_ahead = cur.fetchone()["cnt"]
 
     eta_minutes = prep_time + (queue_ahead * QUEUE_DELAY_MINUTES_PER_ORDER)
