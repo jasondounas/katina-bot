@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
+from urllib.parse import unquote
 import uuid
 import os
 import json
@@ -60,7 +61,12 @@ def verify_waiter(x_waiter_token: str = Header(None)):
 
 
 def get_waiter_name(x_waiter_name: str = Header(None)) -> str:
-    return x_waiter_name or "Unknown"
+    if not x_waiter_name:
+        return "Unknown"
+    try:
+        return unquote(x_waiter_name)
+    except Exception:
+        return x_waiter_name
 
 
 def get_connection():
