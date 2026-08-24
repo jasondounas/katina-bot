@@ -421,7 +421,7 @@
         .period-toggle {
             display: flex;
             gap: 8px;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
         .period-toggle button {
             background: #f0f0f0;
@@ -432,6 +432,21 @@
         .period-toggle button.active {
             background: #1a1a1a;
             color: white;
+        }
+        .waiter-filter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .waiter-filter-row label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #555;
+        }
+        .waiter-filter-row select {
+            flex: 1;
+            max-width: 240px;
         }
         .analytics-summary {
             display: grid;
@@ -507,6 +522,13 @@
             <button id="periodMonthlyBtn" onclick="setPeriod('monthly')">Monthly</button>
         </div>
 
+        <div class="waiter-filter-row">
+            <label id="waiterFilterLabel">Waiter:</label>
+            <select id="waiterFilterSelect" onchange="onWaiterFilterChange(this.value)">
+                <option value="" id="allWaitersOption">All Waiters</option>
+            </select>
+        </div>
+
         <div class="analytics-summary" id="analyticsSummary"></div>
 
         <div class="chart-card">
@@ -515,12 +537,14 @@
         </div>
 
         <div class="chart-card">
-            <h4 id="topItemsTitle">Top-Selling Items</h4>
+            <h4 id="topItemsTitle">Top-Selling Items (All Categories)</h4>
             <div class="chart-wrap"><canvas id="itemsChart"></canvas></div>
         </div>
 
+        <div id="categoryChartsContainer"></div>
+
         <div class="chart-card">
-            <h4 id="waiterPerfTitle">Waiter Performance</h4>
+            <h4 id="waiterPerfTitle">Waiter Comparison</h4>
             <div class="chart-wrap"><canvas id="waiterChart"></canvas></div>
         </div>
 
@@ -623,6 +647,7 @@
         let addImageData = "";
         let editImageData = "";
         let currentPeriod = "daily";
+        let currentWaiterFilter = "";
         let chartInstances = {};
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
@@ -735,8 +760,8 @@
                 extras_summary: (list) => `+ ${list}`,
                 analytics: "Αναλυτικά Στοιχεία",
                 revenue_trend: "Τάση Εσόδων",
-                top_items: "Δημοφιλέστερα Προϊόντα",
-                waiter_perf: "Απόδοση Σερβιτόρων",
+                top_items: "Δημοφιλέστερα Προϊόντα (Όλες οι Κατηγορίες)",
+                waiter_perf: "Σύγκριση Σερβιτόρων",
                 period_daily: "Ημερήσια",
                 period_weekly: "Εβδομαδιαία",
                 period_monthly: "Μηνιαία",
@@ -745,6 +770,8 @@
                 no_chart_data: "Δεν υπάρχουν ακόμα δεδομένα για αυτή την περίοδο.",
                 revenue_axis: "Έσοδα (€)",
                 qty_axis: "Ποσότητα",
+                waiter_filter_label: "Σερβιτόρος:",
+                all_waiters: "Όλοι οι Σερβιτόροι",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -844,8 +871,8 @@
                 extras_summary: (list) => `+ ${list}`,
                 analytics: "Analytics",
                 revenue_trend: "Revenue Trend",
-                top_items: "Top-Selling Items",
-                waiter_perf: "Waiter Performance",
+                top_items: "Top-Selling Items (All Categories)",
+                waiter_perf: "Waiter Comparison",
                 period_daily: "Daily",
                 period_weekly: "Weekly",
                 period_monthly: "Monthly",
@@ -854,6 +881,8 @@
                 no_chart_data: "No data yet for this period.",
                 revenue_axis: "Revenue (€)",
                 qty_axis: "Quantity",
+                waiter_filter_label: "Waiter:",
+                all_waiters: "All Waiters",
                 action_labels: {}
             }
         };
@@ -892,12 +921,12 @@
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
             document.getElementById("menuItemsTitle").innerText = t("menu_items");
             document.getElementById("analyticsTitle").innerText = t("analytics");
-            document.getElementById("revenueTrendTitle").innerText = t("revenue_trend");
-            document.getElementById("topItemsTitle").innerText = t("top_items");
             document.getElementById("waiterPerfTitle").innerText = t("waiter_perf");
             document.getElementById("periodDailyBtn").innerText = t("period_daily");
             document.getElementById("periodWeeklyBtn").innerText = t("period_weekly");
             document.getElementById("periodMonthlyBtn").innerText = t("period_monthly");
+            document.getElementById("waiterFilterLabel").innerText = t("waiter_filter_label");
+            document.getElementById("allWaitersOption").innerText = t("all_waiters");
             document.getElementById("newTableId").placeholder = t("table_id_placeholder");
             document.getElementById("newTableLabel").placeholder = t("table_label_placeholder");
             document.getElementById("addTableBtn").innerText = t("register_table");
@@ -1206,15 +1235,17 @@
             loadAnalytics(period);
         }
 
+        function onWaiterFilterChange(value) {
+            currentWaiterFilter = value;
+            loadAnalytics(currentPeriod);
+        }
+
         function formatBucketLabel(isoStr, period) {
             const d = new Date(isoStr);
-            if (period === "daily") {
-                return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
-            } else if (period === "weekly") {
-                return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
-            } else {
+            if (period === "monthly") {
                 return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", year: "numeric" });
             }
+            return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
         }
 
         function destroyChart(key) {
@@ -1225,20 +1256,37 @@
         }
 
         function loadAnalytics(period) {
-            authFetch(`${BASE}/analytics?period=${period}`)
-                .then(r => r ? r.json() : null)
-                .then(data => {
-                    if (!data) return;
+            const filteredUrl = `${BASE}/analytics?period=${period}` + (currentWaiterFilter ? `&waiter=${encodeURIComponent(currentWaiterFilter)}` : "");
+            const unfilteredUrl = `${BASE}/analytics?period=${period}`;
 
-                    document.getElementById("analyticsSummary").innerHTML = `
-                        <div class="stat-card money"><div class="num">€${data.window_summary.total_revenue.toFixed(2)}</div><div class="label">${t("window_revenue")}</div></div>
-                        <div class="stat-card"><div class="num">${data.window_summary.total_items_sold}</div><div class="label">${t("window_items_sold")}</div></div>
-                    `;
+            Promise.all([
+                authFetch(filteredUrl).then(r => r ? r.json() : null),
+                authFetch(unfilteredUrl).then(r => r ? r.json() : null)
+            ]).then(([filtered, unfiltered]) => {
+                if (!filtered || !unfiltered) return;
 
-                    renderTrendChart(data.trend, period);
-                    renderItemsChart(data.top_items);
-                    renderWaiterChart(data.waiters);
-                });
+                document.getElementById("analyticsSummary").innerHTML = `
+                    <div class="stat-card money"><div class="num">€${filtered.window_summary.total_revenue.toFixed(2)}</div><div class="label">${t("window_revenue")}</div></div>
+                    <div class="stat-card"><div class="num">${filtered.window_summary.total_items_sold}</div><div class="label">${t("window_items_sold")}</div></div>
+                `;
+
+                const waiterSuffix = currentWaiterFilter ? ` — ${currentWaiterFilter}` : "";
+                document.getElementById("revenueTrendTitle").innerText = t("revenue_trend") + waiterSuffix;
+                document.getElementById("topItemsTitle").innerText = t("top_items") + waiterSuffix;
+
+                renderTrendChart(filtered.trend, period);
+                renderItemsChart(filtered.top_items);
+                renderCategoryCharts(filtered.top_items);
+                renderWaiterChart(unfiltered.waiters);
+                populateWaiterDropdown(unfiltered.waiters);
+            });
+        }
+
+        function populateWaiterDropdown(waiters) {
+            const select = document.getElementById("waiterFilterSelect");
+            const names = waiters.map(w => w.waiter_name);
+            select.innerHTML = `<option value="">${t("all_waiters")}</option>` + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+            select.value = names.includes(currentWaiterFilter) ? currentWaiterFilter : "";
         }
 
         function renderTrendChart(trend, period) {
@@ -1321,6 +1369,56 @@
                     plugins: { legend: { display: false } },
                     scales: { x: { beginAtZero: true } }
                 }
+            });
+        }
+
+        function renderCategoryCharts(topItems) {
+            const container = document.getElementById("categoryChartsContainer");
+
+            Object.keys(chartInstances).forEach(key => {
+                if (key.startsWith("cat_")) {
+                    chartInstances[key].destroy();
+                    delete chartInstances[key];
+                }
+            });
+            container.innerHTML = "";
+
+            if (!topItems || topItems.length === 0) return;
+
+            const byCategory = {};
+            topItems.forEach(i => {
+                const cat = i.category || "other";
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(i);
+            });
+
+            Object.keys(byCategory).forEach(cat => {
+                const items = byCategory[cat].slice(0, 8);
+                const card = document.createElement("div");
+                card.className = "chart-card";
+                const canvasId = `catChart_${cat.replace(/[^a-zA-Z0-9]/g, "_")}`;
+                card.innerHTML = `<h4>${categoryLabel(cat)}</h4><div class="chart-wrap"><canvas id="${canvasId}"></canvas></div>`;
+                container.appendChild(card);
+
+                const canvas = document.getElementById(canvasId);
+                chartInstances[`cat_${cat}`] = new Chart(canvas, {
+                    type: "bar",
+                    data: {
+                        labels: items.map(i => i.item.charAt(0).toUpperCase() + i.item.slice(1)),
+                        datasets: [{
+                            label: t("qty_axis"),
+                            data: items.map(i => i.qty_sold),
+                            backgroundColor: "#ff6b35"
+                        }]
+                    },
+                    options: {
+                        indexAxis: "y",
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true } }
+                    }
+                });
             });
         }
 
