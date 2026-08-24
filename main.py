@@ -202,6 +202,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE orders ADD COLUMN approved_at TIMESTAMP")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN category TEXT DEFAULT 'other'")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
@@ -309,6 +315,85 @@ def get_revenue_stats(_auth: None = Depends(verify_waiter)):
     cur.close()
     conn.close()
     return {"total_revenue": float(total_revenue), "unpaid_amount": float(unpaid_amount)}
+
+
+@app.get("/analytics")
+def get_analytics(period: str = "daily", _auth: None = Depends(verify_waiter)):
+    if period not in ("daily", "weekly", "monthly"):
+        period = "daily"
+
+    now = datetime.utcnow()
+    if period == "daily":
+        window_start = now - timedelta(days=1)
+        trend_start = now - timedelta(days=14)
+        trend_group = "day"
+    elif period == "weekly":
+        window_start = now - timedelta(days=7)
+        trend_start = now - timedelta(weeks=8)
+        trend_group = "week"
+    else:
+        window_start = now - timedelta(days=30)
+        trend_start = now - timedelta(days=180)
+        trend_group = "month"
+
+    conn = get_connection()
+    cur = get_cursor(conn)
+
+    cur.execute("""
+        SELECT date_trunc(%s, approved_at) as bucket,
+               COALESCE(SUM(price * qty), 0) as revenue,
+               COALESCE(SUM(qty), 0) as items_sold
+        FROM orders
+        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s
+        GROUP BY bucket
+        ORDER BY bucket
+    """, (trend_group, trend_start))
+    trend_rows = cur.fetchall()
+
+    cur.execute("""
+        SELECT item,
+               COALESCE(SUM(qty), 0) as qty_sold,
+               COALESCE(SUM(price * qty), 0) as revenue
+        FROM orders
+        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s
+        GROUP BY item
+        ORDER BY qty_sold DESC
+    """, (window_start,))
+    top_items_rows = cur.fetchall()
+
+    cur.execute("""
+        SELECT handled_by as waiter_name,
+               COUNT(*) as orders_count,
+               COALESCE(SUM(price * qty), 0) as revenue
+        FROM orders
+        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s AND handled_by IS NOT NULL
+        GROUP BY handled_by
+        ORDER BY revenue DESC
+    """, (window_start,))
+    waiter_rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return {
+        "period": period,
+        "window_summary": {
+            "total_revenue": float(sum(r["revenue"] for r in top_items_rows)),
+            "total_items_sold": int(sum(r["qty_sold"] for r in top_items_rows)),
+        },
+        "trend": [
+            {"bucket": r["bucket"].isoformat() + "Z", "revenue": float(r["revenue"]), "items_sold": int(r["items_sold"])}
+            for r in trend_rows
+        ],
+        "top_items": [
+            {"item": r["item"], "qty_sold": int(r["qty_sold"]), "revenue": float(r["revenue"])}
+            for r in top_items_rows
+        ],
+        "waiters": [
+            {"waiter_name": r["waiter_name"], "orders_count": int(r["orders_count"]), "revenue": float(r["revenue"])}
+            for r in waiter_rows
+        ],
+    }
 
 
 # ---------- Menu Items ----------
@@ -1054,8 +1139,8 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
     estimated_ready_at = now_utc + timedelta(minutes=eta_minutes)
 
     cur.execute(
-        "UPDATE orders SET status = %s, handled_by = %s, estimated_ready_at = %s WHERE order_id = %s",
-        ("APPROVED", waiter_name, estimated_ready_at, order_id),
+        "UPDATE orders SET status = %s, handled_by = %s, estimated_ready_at = %s, approved_at = %s WHERE order_id = %s",
+        ("APPROVED", waiter_name, estimated_ready_at, now_utc, order_id),
     )
     conn.commit()
     cur.close()
