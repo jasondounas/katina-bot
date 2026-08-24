@@ -3,6 +3,7 @@
 <head>
     <title>Katina — Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -416,6 +417,51 @@
             border: 1.5px solid #eee; border-radius: 10px; font-size: 14px;
         }
         .edit-modal label { font-size: 12px; color: #777; font-weight: 700; display:block; margin-bottom:4px; }
+
+        .period-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+        .period-toggle button {
+            background: #f0f0f0;
+            color: #555;
+            font-size: 13px;
+            padding: 10px 18px;
+        }
+        .period-toggle button.active {
+            background: #1a1a1a;
+            color: white;
+        }
+        .analytics-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .chart-card {
+            background: white;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 18px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+        }
+        .chart-card h4 {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 14px;
+            color: #333;
+        }
+        .chart-wrap {
+            position: relative;
+            height: 260px;
+        }
+        .chart-empty {
+            color: #999;
+            font-size: 14px;
+            text-align: center;
+            padding: 40px 0;
+        }
     </style>
 </head>
 <body>
@@ -452,6 +498,31 @@
 
         <div class="section-title"><span><span class="bar"></span><span id="liveAlertsTitle">Live Alerts</span></span></div>
         <div id="alertsList"><div class="loading-block"><div class="spinner"></div></div></div>
+
+        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="analyticsTitle">Analytics</span></span></div>
+
+        <div class="period-toggle">
+            <button id="periodDailyBtn" class="active" onclick="setPeriod('daily')">Daily</button>
+            <button id="periodWeeklyBtn" onclick="setPeriod('weekly')">Weekly</button>
+            <button id="periodMonthlyBtn" onclick="setPeriod('monthly')">Monthly</button>
+        </div>
+
+        <div class="analytics-summary" id="analyticsSummary"></div>
+
+        <div class="chart-card">
+            <h4 id="revenueTrendTitle">Revenue Trend</h4>
+            <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+            <h4 id="topItemsTitle">Top-Selling Items</h4>
+            <div class="chart-wrap"><canvas id="itemsChart"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+            <h4 id="waiterPerfTitle">Waiter Performance</h4>
+            <div class="chart-wrap"><canvas id="waiterChart"></canvas></div>
+        </div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="tablesTitle">Tables</span></span></div>
 
@@ -551,6 +622,8 @@
         let activityLoaded = false;
         let addImageData = "";
         let editImageData = "";
+        let currentPeriod = "daily";
+        let chartInstances = {};
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -660,6 +733,18 @@
                 delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
                 cannot_delete_occupied: "Δεν είναι δυνατή η διαγραφή τραπεζιού με ενεργή συνεδρία — απελευθερώστε το πρώτα.",
                 extras_summary: (list) => `+ ${list}`,
+                analytics: "Αναλυτικά Στοιχεία",
+                revenue_trend: "Τάση Εσόδων",
+                top_items: "Δημοφιλέστερα Προϊόντα",
+                waiter_perf: "Απόδοση Σερβιτόρων",
+                period_daily: "Ημερήσια",
+                period_weekly: "Εβδομαδιαία",
+                period_monthly: "Μηνιαία",
+                window_revenue: "Έσοδα Περιόδου",
+                window_items_sold: "Προϊόντα που Πουλήθηκαν",
+                no_chart_data: "Δεν υπάρχουν ακόμα δεδομένα για αυτή την περίοδο.",
+                revenue_axis: "Έσοδα (€)",
+                qty_axis: "Ποσότητα",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -677,7 +762,8 @@
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
-                    "moved table": "μετακίνησε τραπέζι"
+                    "moved table": "μετακίνησε τραπέζι",
+                    "cleared kitchen queue": "καθάρισε την ουρά κουζίνας"
                 }
             },
             en: {
@@ -756,6 +842,18 @@
                 delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
                 cannot_delete_occupied: "Cannot delete a table with an active session — release it first.",
                 extras_summary: (list) => `+ ${list}`,
+                analytics: "Analytics",
+                revenue_trend: "Revenue Trend",
+                top_items: "Top-Selling Items",
+                waiter_perf: "Waiter Performance",
+                period_daily: "Daily",
+                period_weekly: "Weekly",
+                period_monthly: "Monthly",
+                window_revenue: "Period Revenue",
+                window_items_sold: "Items Sold",
+                no_chart_data: "No data yet for this period.",
+                revenue_axis: "Revenue (€)",
+                qty_axis: "Quantity",
                 action_labels: {}
             }
         };
@@ -774,6 +872,7 @@
                 loadAlerts();
                 loadMenuItems();
                 loadTablesManagement();
+                loadAnalytics(currentPeriod);
                 if (activityLoaded) loadActivity();
             }
         }
@@ -792,6 +891,13 @@
             document.getElementById("tablesTitle").innerText = t("tables");
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
             document.getElementById("menuItemsTitle").innerText = t("menu_items");
+            document.getElementById("analyticsTitle").innerText = t("analytics");
+            document.getElementById("revenueTrendTitle").innerText = t("revenue_trend");
+            document.getElementById("topItemsTitle").innerText = t("top_items");
+            document.getElementById("waiterPerfTitle").innerText = t("waiter_perf");
+            document.getElementById("periodDailyBtn").innerText = t("period_daily");
+            document.getElementById("periodWeeklyBtn").innerText = t("period_weekly");
+            document.getElementById("periodMonthlyBtn").innerText = t("period_monthly");
             document.getElementById("newTableId").placeholder = t("table_id_placeholder");
             document.getElementById("newTableLabel").placeholder = t("table_label_placeholder");
             document.getElementById("addTableBtn").innerText = t("register_table");
@@ -1018,6 +1124,7 @@
             loadAlerts();
             loadTablesManagement();
             loadMenuItems();
+            loadAnalytics(currentPeriod);
             setInterval(() => { loadStats(); loadAlerts(); }, 8000);
         }
 
@@ -1088,6 +1195,170 @@
                 });
 
                 document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">${t("no_alerts")}</div>`;
+            });
+        }
+
+        function setPeriod(period) {
+            currentPeriod = period;
+            document.getElementById("periodDailyBtn").classList.toggle("active", period === "daily");
+            document.getElementById("periodWeeklyBtn").classList.toggle("active", period === "weekly");
+            document.getElementById("periodMonthlyBtn").classList.toggle("active", period === "monthly");
+            loadAnalytics(period);
+        }
+
+        function formatBucketLabel(isoStr, period) {
+            const d = new Date(isoStr);
+            if (period === "daily") {
+                return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
+            } else if (period === "weekly") {
+                return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
+            } else {
+                return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", year: "numeric" });
+            }
+        }
+
+        function destroyChart(key) {
+            if (chartInstances[key]) {
+                chartInstances[key].destroy();
+                chartInstances[key] = null;
+            }
+        }
+
+        function loadAnalytics(period) {
+            authFetch(`${BASE}/analytics?period=${period}`)
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+
+                    document.getElementById("analyticsSummary").innerHTML = `
+                        <div class="stat-card money"><div class="num">€${data.window_summary.total_revenue.toFixed(2)}</div><div class="label">${t("window_revenue")}</div></div>
+                        <div class="stat-card"><div class="num">${data.window_summary.total_items_sold}</div><div class="label">${t("window_items_sold")}</div></div>
+                    `;
+
+                    renderTrendChart(data.trend, period);
+                    renderItemsChart(data.top_items);
+                    renderWaiterChart(data.waiters);
+                });
+        }
+
+        function renderTrendChart(trend, period) {
+            const canvas = document.getElementById("trendChart");
+            destroyChart("trend");
+
+            if (!trend || trend.length === 0) {
+                canvas.style.display = "none";
+                let msg = canvas.parentElement.querySelector(".chart-empty");
+                if (!msg) {
+                    msg = document.createElement("div");
+                    msg.className = "chart-empty";
+                    canvas.parentElement.appendChild(msg);
+                }
+                msg.innerText = t("no_chart_data");
+                return;
+            }
+            canvas.style.display = "block";
+            const existingMsg = canvas.parentElement.querySelector(".chart-empty");
+            if (existingMsg) existingMsg.remove();
+
+            chartInstances.trend = new Chart(canvas, {
+                type: "line",
+                data: {
+                    labels: trend.map(r => formatBucketLabel(r.bucket, period)),
+                    datasets: [{
+                        label: t("revenue_axis"),
+                        data: trend.map(r => r.revenue),
+                        borderColor: "#ff6b35",
+                        backgroundColor: "rgba(255,107,53,0.12)",
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: "#ff6b35"
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderItemsChart(items) {
+            const canvas = document.getElementById("itemsChart");
+            destroyChart("items");
+
+            if (!items || items.length === 0) {
+                canvas.style.display = "none";
+                let msg = canvas.parentElement.querySelector(".chart-empty");
+                if (!msg) {
+                    msg = document.createElement("div");
+                    msg.className = "chart-empty";
+                    canvas.parentElement.appendChild(msg);
+                }
+                msg.innerText = t("no_chart_data");
+                return;
+            }
+            canvas.style.display = "block";
+            const existingMsg = canvas.parentElement.querySelector(".chart-empty");
+            if (existingMsg) existingMsg.remove();
+
+            const top = items.slice(0, 8);
+            chartInstances.items = new Chart(canvas, {
+                type: "bar",
+                data: {
+                    labels: top.map(i => i.item.charAt(0).toUpperCase() + i.item.slice(1)),
+                    datasets: [{
+                        label: t("qty_axis"),
+                        data: top.map(i => i.qty_sold),
+                        backgroundColor: "#7c3aed"
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderWaiterChart(waiters) {
+            const canvas = document.getElementById("waiterChart");
+            destroyChart("waiter");
+
+            if (!waiters || waiters.length === 0) {
+                canvas.style.display = "none";
+                let msg = canvas.parentElement.querySelector(".chart-empty");
+                if (!msg) {
+                    msg = document.createElement("div");
+                    msg.className = "chart-empty";
+                    canvas.parentElement.appendChild(msg);
+                }
+                msg.innerText = t("no_chart_data");
+                return;
+            }
+            canvas.style.display = "block";
+            const existingMsg = canvas.parentElement.querySelector(".chart-empty");
+            if (existingMsg) existingMsg.remove();
+
+            chartInstances.waiter = new Chart(canvas, {
+                type: "bar",
+                data: {
+                    labels: waiters.map(w => w.waiter_name),
+                    datasets: [{
+                        label: t("revenue_axis"),
+                        data: waiters.map(w => w.revenue),
+                        backgroundColor: "#1d7d72"
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
             });
         }
 
