@@ -308,8 +308,7 @@
         .order-status .item-name { font-weight: 700; font-size: 15px; }
         .order-status .item-note { font-size: 12px; color: #999; font-style: italic; margin-top: 2px; }
         .order-status .item-extras { font-size: 12px; color: #7c3aed; margin-top: 2px; }
-        .order-status .item-eta { font-size: 12.5px; color: #b9770e; font-weight: 700; margin-top: 3px; }
-        .order-status .item-eta.ready { color: #1d7d72; }
+        .order-status .item-ready { font-size: 12.5px; color: #1d7d72; font-weight: 700; margin-top: 3px; }
         .pill { font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 20px; flex-shrink: 0; margin-left: 10px; }
         .pill.PENDING_REVIEW { background: #fff4e6; color: #b9770e; }
         .pill.APPROVED { background: #e6f5f3; color: #1d7d72; }
@@ -576,7 +575,6 @@
                 send_error: "Κάτι πήγε στραβά — παρακαλώ δοκιμάστε ξανά.",
                 add_cart_first: "Προσθέστε κάτι στο καλάθι σας πρώτα.",
                 view_cart: "Προβολή καλαθιού",
-                eta_label: (n) => `⏱️ ~${n} λεπτά`,
                 ready_now: "✅ Έτοιμο!",
                 status_labels: { PENDING_REVIEW: "ΕΚΚΡΕΜΕΙ", APPROVED: "ΕΓΚΡΙΘΗΚΕ", READY: "ΕΤΟΙΜΟ", REJECTED: "ΑΠΟΡΡΙΦΘΗΚΕ", CANCELLED: "ΑΚΥΡΩΘΗΚΕ" },
                 category_labels: { drinks: "🥤 Ποτά", salads: "🥗 Σαλάτες", burgers: "🍔 Μπέργκερ", other: "🍽️ Άλλα" }
@@ -610,7 +608,6 @@
                 send_error: "Something went wrong — please try again.",
                 add_cart_first: "Add something to your cart first.",
                 view_cart: "View cart",
-                eta_label: (n) => `⏱️ ~${n} min`,
                 ready_now: "✅ Ready!",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", READY: "READY", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
                 category_labels: { drinks: "🥤 Drinks", salads: "🥗 Salads", burgers: "🍔 Burgers", other: "🍽️ More" }
@@ -1077,19 +1074,14 @@
                         ? orders.map(o => {
                             const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
 
-                            let etaHtml = "";
                             let pillClass = o.status;
                             let pillLabel = t("status_labels")[o.status] || o.status;
+                            let readyMsg = "";
 
-                            if (o.status === "APPROVED") {
-                                if (o.ready) {
-                                    etaHtml = `<div class="item-eta ready">${t("ready_now")}</div>`;
-                                    pillClass = "READY";
-                                    pillLabel = t("status_labels").READY;
-                                } else if (o.estimated_ready_at) {
-                                    const minutesLeft = Math.max(1, Math.ceil((new Date(o.estimated_ready_at) - new Date()) / 60000));
-                                    etaHtml = `<div class="item-eta">${t("eta_label", minutesLeft)}</div>`;
-                                }
+                            if (o.status === "APPROVED" && o.ready) {
+                                readyMsg = `<div class="item-ready">${t("ready_now")}</div>`;
+                                pillClass = "READY";
+                                pillLabel = t("status_labels").READY;
                             }
 
                             return `
@@ -1098,7 +1090,7 @@
                                     <span class="item-name">${o.qty}x ${escapeHtml(capitalize(o.item))}</span>
                                     ${extrasList ? `<div class="item-extras">+ ${extrasList}</div>` : ""}
                                     ${o.note ? `<div class="item-note">💬 ${escapeHtml(o.note)}</div>` : ""}
-                                    ${etaHtml}
+                                    ${readyMsg}
                                 </div>
                                 <span class="pill ${pillClass}">${pillLabel}</span>
                             </div>
