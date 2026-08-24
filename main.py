@@ -318,7 +318,7 @@ def get_revenue_stats(_auth: None = Depends(verify_waiter)):
 
 
 @app.get("/analytics")
-def get_analytics(period: str = "daily", _auth: None = Depends(verify_waiter)):
+def get_analytics(period: str = "daily", waiter: str = None, _auth: None = Depends(verify_waiter)):
     if period not in ("daily", "weekly", "monthly"):
         period = "daily"
 
@@ -339,37 +339,45 @@ def get_analytics(period: str = "daily", _auth: None = Depends(verify_waiter)):
     conn = get_connection()
     cur = get_cursor(conn)
 
-    cur.execute("""
+    waiter_clause = " AND handled_by = %s" if waiter else ""
+    trend_params = [trend_group, trend_start] + ([waiter] if waiter else [])
+    cur.execute(f"""
         SELECT date_trunc(%s, approved_at) as bucket,
                COALESCE(SUM(price * qty), 0) as revenue,
                COALESCE(SUM(qty), 0) as items_sold
         FROM orders
-        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s
+        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s{waiter_clause}
         GROUP BY bucket
         ORDER BY bucket
-    """, (trend_group, trend_start))
+    """, trend_params)
     trend_rows = cur.fetchall()
 
-    cur.execute("""
-        SELECT item,
-               COALESCE(SUM(qty), 0) as qty_sold,
-               COALESCE(SUM(price * qty), 0) as revenue
-        FROM orders
-        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s
-        GROUP BY item
+    items_waiter_clause = " AND o.handled_by = %s" if waiter else ""
+    items_params = [window_start] + ([waiter] if waiter else [])
+    cur.execute(f"""
+        SELECT o.item,
+               COALESCE(m.category, 'other') as category,
+               COALESCE(SUM(o.qty), 0) as qty_sold,
+               COALESCE(SUM(o.price * o.qty), 0) as revenue
+        FROM orders o
+        LEFT JOIN menu_items m ON o.item = m.item_id
+        WHERE o.status = 'APPROVED' AND o.approved_at IS NOT NULL AND o.approved_at >= %s{items_waiter_clause}
+        GROUP BY o.item, m.category
         ORDER BY qty_sold DESC
-    """, (window_start,))
+    """, items_params)
     top_items_rows = cur.fetchall()
 
-    cur.execute("""
+    waiters_extra_clause = " AND handled_by = %s" if waiter else ""
+    waiters_params = [window_start] + ([waiter] if waiter else [])
+    cur.execute(f"""
         SELECT handled_by as waiter_name,
                COUNT(*) as orders_count,
                COALESCE(SUM(price * qty), 0) as revenue
         FROM orders
-        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s AND handled_by IS NOT NULL
+        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s AND handled_by IS NOT NULL{waiters_extra_clause}
         GROUP BY handled_by
         ORDER BY revenue DESC
-    """, (window_start,))
+    """, waiters_params)
     waiter_rows = cur.fetchall()
 
     cur.close()
@@ -377,6 +385,7 @@ def get_analytics(period: str = "daily", _auth: None = Depends(verify_waiter)):
 
     return {
         "period": period,
+        "waiter_filter": waiter,
         "window_summary": {
             "total_revenue": float(sum(r["revenue"] for r in top_items_rows)),
             "total_items_sold": int(sum(r["qty_sold"] for r in top_items_rows)),
@@ -386,7 +395,7 @@ def get_analytics(period: str = "daily", _auth: None = Depends(verify_waiter)):
             for r in trend_rows
         ],
         "top_items": [
-            {"item": r["item"], "qty_sold": int(r["qty_sold"]), "revenue": float(r["revenue"])}
+            {"item": r["item"], "category": r["category"], "qty_sold": int(r["qty_sold"]), "revenue": float(r["revenue"])}
             for r in top_items_rows
         ],
         "waiters": [
