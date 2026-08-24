@@ -898,6 +898,21 @@ def get_ready_orders():
     return [format_order(dict(o)) for o in orders]
 
 
+@app.post("/orders/clear-queue")
+def clear_kitchen_queue(_auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("UPDATE orders SET ready = 1 WHERE status = 'APPROVED' AND ready = 0")
+    cleared = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "cleared kitchen queue", f"{cleared} orders")
+
+    return {"cleared": cleared}
+
+
 def get_menu_item_row(item: str):
     conn = get_connection()
     cur = get_cursor(conn)
@@ -974,12 +989,12 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
     }
 
 
-def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "") -> str:
+def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "") -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
                 f"{PDA_URL}/kitchen-ticket",
-                params={"order_id": order_id, "item": item, "qty": qty, "note": note, "extras": extras},
+                params={"order_id": order_id, "item": item, "qty": qty, "note": note, "extras": extras, "table_label": table_label},
                 timeout=5.0,
             )
             if response.status_code == 200:
@@ -1011,21 +1026,32 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
     extras_list = parse_extras(order.get("extras"))
     extras_text = ", ".join(e.get("name", "") for e in extras_list)
 
-    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text)
+    table_label = order["session_id"]
+    cur.execute("SELECT table_id FROM sessions WHERE session_id = %s", (order["session_id"],))
+    session_row = cur.fetchone()
+    if session_row:
+        cur.execute("SELECT display_label, table_id FROM tables WHERE table_id = %s", (session_row["table_id"],))
+        table_row = cur.fetchone()
+        if table_row:
+            table_label = table_row["display_label"] or table_row["table_id"]
+
+    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label)
 
     menu_row = get_menu_item_row(order["item"])
     prep_time = menu_row["prep_time_minutes"] if menu_row and menu_row.get("prep_time_minutes") else 10
 
+    now_utc = datetime.utcnow()
     cur.execute("""
         SELECT COUNT(*) as cnt
         FROM orders o
         JOIN sessions s ON o.session_id = s.session_id
         WHERE o.status = 'APPROVED' AND o.ready = 0 AND s.status = 'OPEN'
-    """)
+        AND o.estimated_ready_at > %s
+    """, (now_utc,))
     queue_ahead = cur.fetchone()["cnt"]
 
     eta_minutes = prep_time + (queue_ahead * QUEUE_DELAY_MINUTES_PER_ORDER)
-    estimated_ready_at = datetime.utcnow() + timedelta(minutes=eta_minutes)
+    estimated_ready_at = now_utc + timedelta(minutes=eta_minutes)
 
     cur.execute(
         "UPDATE orders SET status = %s, handled_by = %s, estimated_ready_at = %s WHERE order_id = %s",
