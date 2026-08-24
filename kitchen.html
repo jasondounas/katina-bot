@@ -4,44 +4,48 @@
     <title>Katina — Kitchen</title>
     <style>
         body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
-        h1 { text-align: center; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+        h1 { text-align: center; font-size: 36px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
         .ticket {
             background: #2c2c2c;
-            border-left: 6px solid #e67e22;
-            border-radius: 8px;
-            padding: 16px;
+            border-left: 8px solid #e67e22;
+            border-radius: 10px;
+            padding: 24px;
         }
-        .ticket h2 { margin: 0 0 8px 0; font-size: 28px; }
-        .ticket p { margin: 4px 0; color: #ccc; }
+        .ticket .table-name { margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: #f5b878; }
+        .ticket h2 { margin: 0 0 10px 0; font-size: 36px; }
+        .ticket p { margin: 6px 0; color: #ccc; font-size: 18px; }
         .ticket .extras {
-            margin-top: 8px;
+            margin-top: 12px;
             background: #1a2e4d;
-            border-left: 3px solid #4a90e2;
-            border-radius: 4px;
-            padding: 8px 10px;
+            border-left: 4px solid #4a90e2;
+            border-radius: 6px;
+            padding: 12px 14px;
             color: #a8c8f0;
-            font-size: 14px;
+            font-size: 20px;
+            font-weight: 600;
         }
         .ticket .note {
-            margin-top: 8px;
+            margin-top: 12px;
             background: #3d2e17;
-            border-left: 3px solid #f39c12;
-            border-radius: 4px;
-            padding: 8px 10px;
+            border-left: 4px solid #f39c12;
+            border-radius: 6px;
+            padding: 12px 14px;
             color: #ffd699;
-            font-size: 14px;
+            font-size: 20px;
             font-style: italic;
+            font-weight: 600;
         }
         button {
-            margin-top: 10px;
+            margin-top: 16px;
             background: #27ae60;
             border: none;
             color: white;
-            padding: 8px 14px;
-            border-radius: 6px;
+            padding: 14px 22px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 18px;
+            font-weight: 700;
         }
         button:disabled {
             background: #555;
@@ -98,14 +102,14 @@
                     grid.innerHTML = tickets.length
                         ? tickets.map(t => `
                             <div class="ticket">
+                                <p class="table-name">${escapeHtml(t.table_label || 'Table')}</p>
                                 <h2>${t.qty}x ${escapeHtml(t.item)}</h2>
-                                <p>Order #${t.order_id}</p>
                                 ${t.extras ? `<div class="extras">+ ${escapeHtml(t.extras)}</div>` : ""}
                                 ${t.note ? `<div class="note">💬 ${escapeHtml(t.note)}</div>` : ""}
                                 <button onclick="markDone('${t.order_id}', this)">✅ Ready</button>
                             </div>
                         `).join("")
-                        : "<p style='color:#888;'>No active tickets.</p>";
+                        : "<p style='color:#888; font-size:20px;'>No active tickets.</p>";
                 });
         }
 
