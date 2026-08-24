@@ -781,7 +781,7 @@
         function authHeaders() {
             return {
                 "X-Waiter-Token": getToken(),
-                "X-Waiter-Name": getWaiterName()
+                "X-Waiter-Name": encodeURIComponent(getWaiterName())
             };
         }
 
