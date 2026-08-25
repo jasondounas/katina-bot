@@ -375,6 +375,17 @@
             font-size: 12px;
             padding: 8px 12px;
         }
+        .orders-heading-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 20px 0 10px;
+        }
+        .orders-heading-row h3 { font-size: 16px; margin: 0; }
+        .bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .bulk-actions button { font-size: 12px; padding: 8px 12px; }
         .action-row { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
         .close-modal {
             position: absolute; top: 24px; right: 24px;
@@ -529,6 +540,8 @@
                 order_ready_alert: (n) => `${n} παραγγελία(ες) έτοιμες προς παραλαβή`,
                 ready_tag: "✅ Έτοιμο",
                 picked_up: "Παρέλαβα",
+                accept_all: "Αποδοχή Όλων",
+                pickup_all: "Παρέλαβα Όλα",
                 needs_release: "⏹️ ΧΡΕΙΑΖΕΤΑΙ ΑΠΕΛΕΥΘΕΡΩΣΗ",
                 session_status: (s) => `Συνεδρία: ${s}`,
                 cash: "💵 Μετρητά",
@@ -575,9 +588,11 @@
                     "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
+                    "approved all orders": "ενέκρινε όλες τις παραγγελίες",
                     "rejected order": "απέρριψε παραγγελία",
                     "deleted order": "διέγραψε παραγγελία",
                     "picked up order": "παρέλαβε παραγγελία",
+                    "picked up all orders": "παρέλαβε όλες τις παραγγελίες",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
@@ -614,6 +629,8 @@
                 order_ready_alert: (n) => `${n} order(s) ready for pickup`,
                 ready_tag: "✅ Ready",
                 picked_up: "Picked Up",
+                accept_all: "Accept All",
+                pickup_all: "Pick Up All",
                 needs_release: "⏹️ NEEDS RELEASE",
                 session_status: (s) => `Session ${s}`,
                 cash: "💵 Cash",
@@ -1170,6 +1187,9 @@
                                         .filter(o => o.status === "APPROVED")
                                         .reduce((sum, o) => sum + (o.price * o.qty), 0);
 
+                                    const pendingCount = orders.filter(o => o.status === "PENDING_REVIEW").length;
+                                    const readyCount = orders.filter(o => o.status === "APPROVED" && o.ready).length;
+
                                     let ordersHtml = orders.length
                                         ? orders.map(o => {
                                             const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
@@ -1214,6 +1234,11 @@
                                         alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">${t("table_requested_bill_msg", methodLabel)}</p>`;
                                     }
 
+                                    const bulkButtons = `
+                                        ${pendingCount > 0 ? `<button class="success" onclick="approveAll('${session.session_id}')">${t("accept_all")}</button>` : ""}
+                                        ${readyCount > 0 ? `<button class="success" onclick="pickupAll('${session.session_id}')">${t("pickup_all")}</button>` : ""}
+                                    `;
+
                                     content.innerHTML = `
                                         <h2>${safeLabel}${renameIcon}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">
@@ -1224,7 +1249,10 @@
                                         <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
                                         ${alerts}
-                                        <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
+                                        <div class="orders-heading-row">
+                                            <h3>${t("orders_heading")}</h3>
+                                            <div class="bulk-actions">${bulkButtons}</div>
+                                        </div>
                                         ${ordersHtml}
                                         <div class="action-row">
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
@@ -1329,6 +1357,22 @@
                 });
         }
 
+        function approveAll(sessionId) {
+            authFetch(`${BASE}/sessions/${sessionId}/approve-all`, {
+                method: "POST"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
+                });
+        }
+
         function rejectOrder(orderId) {
             authFetch(`${BASE}/orders/${orderId}/reject`, {
                 method: "POST"
@@ -1347,6 +1391,22 @@
 
         function pickedUp(orderId) {
             authFetch(`${BASE}/orders/${orderId}/picked-up`, {
+                method: "POST"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        document.getElementById("modalResult").innerText = data.error;
+                        return;
+                    }
+                    openTableModal(currentTableId);
+                    loadTables();
+                });
+        }
+
+        function pickupAll(sessionId) {
+            authFetch(`${BASE}/sessions/${sessionId}/pickup-all`, {
                 method: "POST"
             })
                 .then(r => r ? r.json() : null)
