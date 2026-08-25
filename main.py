@@ -1067,12 +1067,20 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
     }
 
 
-def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "") -> str:
+def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "", category: str = "other") -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
                 f"{PDA_URL}/kitchen-ticket",
-                params={"order_id": order_id, "item": item, "qty": qty, "note": note, "extras": extras, "table_label": table_label},
+                params={
+                    "order_id": order_id,
+                    "item": item,
+                    "qty": qty,
+                    "note": note,
+                    "extras": extras,
+                    "table_label": table_label,
+                    "category": category,
+                },
                 timeout=5.0,
             )
             if response.status_code == 200:
@@ -1113,7 +1121,10 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         if table_row:
             table_label = table_row["display_label"] or table_row["table_id"]
 
-    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label)
+    menu_row = get_menu_item_row(order["item"])
+    category = menu_row["category"] if menu_row and menu_row.get("category") else "other"
+
+    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
 
     now_utc = datetime.utcnow()
 
@@ -1160,7 +1171,9 @@ def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wa
     for order in pending:
         extras_list = parse_extras(order.get("extras"))
         extras_text = ", ".join(e.get("name", "") for e in extras_list)
-        send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label)
+        menu_row = get_menu_item_row(order["item"])
+        category = menu_row["category"] if menu_row and menu_row.get("category") else "other"
+        send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
         cur.execute(
             "UPDATE orders SET status = 'APPROVED', handled_by = %s, approved_at = %s WHERE order_id = %s",
             (waiter_name, now_utc, order["order_id"]),
