@@ -375,15 +375,6 @@
             font-size: 12px;
             padding: 8px 12px;
         }
-        .orders-heading-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 20px 0 10px;
-        }
-        .orders-heading-row h3 { font-size: 16px; margin: 0; }
         .bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .bulk-actions button { font-size: 12px; padding: 8px 12px; }
         .action-row { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1216,7 +1207,7 @@
                                                     ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
                                                     ${readyTag}
                                                     ${extrasList ? `<div style="font-size:11.5px; color:#1d5fd7; margin-top:2px; white-space:normal;">+ ${extrasList}</div>` : ""}
-                                                    ${o.note ? `<div style="font-size:11.5px; color:#7c3aed; font-style:italic; margin-top:2px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                                    ${o.note ? `<div style="font-size:14px; color:#e74c3c; font-weight:700; font-style:italic; margin-top:4px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
                                                 </div>
                                                 <div class="actions">${actionsHtml}</div>
                                             </div>
@@ -1249,11 +1240,9 @@
                                         <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
                                         ${alerts}
-                                        <div class="orders-heading-row">
-                                            <h3>${t("orders_heading")}</h3>
-                                            <div class="bulk-actions">${bulkButtons}</div>
-                                        </div>
+                                        <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
                                         ${ordersHtml}
+                                        <div class="bulk-actions" style="margin-top:12px;">${bulkButtons}</div>
                                         <div class="action-row">
                                             <button class="success" onclick="markPaid('${session.session_id}')">${t("mark_paid")}</button>
                                             <button class="secondary" onclick="openMovePicker('${tableId}', '${safeLabel}')">⇄ ${t("move_table")}</button>
