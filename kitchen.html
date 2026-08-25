@@ -4,8 +4,34 @@
     <title>Katina — Kitchen</title>
     <style>
         body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
-        h1 { text-align: center; font-size: 36px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        h1 { text-align: center; font-size: 36px; margin-bottom: 30px; }
+
+        .category-section { margin-bottom: 36px; }
+        .category-heading {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #ff6b35;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .category-count {
+            background: #ff6b35;
+            color: white;
+            font-size: 16px;
+            font-weight: 800;
+            padding: 3px 12px;
+            border-radius: 20px;
+        }
+
+        .ticket-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
         .ticket {
             background: #2c2c2c;
             border-left: 8px solid #e67e22;
@@ -51,16 +77,29 @@
             background: #555;
             cursor: default;
         }
+        .empty-msg { color: #888; font-size: 20px; text-align: center; padding: 40px 0; }
     </style>
 </head>
 <body>
     <h1>🔥 Kitchen Display</h1>
-    <div class="grid" id="ticketGrid"></div>
+    <div id="categorySections"></div>
 
     <script>
        const PDA = "https://katina-bot-1.onrender.com";
        const BASE = "https://katina-bot.onrender.com";
        let previousTicketCount = 0;
+
+       const CATEGORY_LABELS = {
+           drinks: "🥤 Drinks",
+           salads: "🥗 Salads",
+           burgers: "🍔 Burgers",
+           other: "🍽️ Other"
+       };
+       const CATEGORY_ORDER = ["drinks", "salads", "burgers"];
+
+       function categoryLabel(cat) {
+           return CATEGORY_LABELS[cat] || ("🍽️ " + cat.charAt(0).toUpperCase() + cat.slice(1));
+       }
 
        function playNotificationSound() {
            try {
@@ -89,29 +128,59 @@
                .replace(/'/g, "&#39;");
        }
 
-       function loadTickets() {
-    fetch(`${PDA}/kitchen-tickets`)
-        .then(r => r.json())
-        .then(tickets => {
-            if (tickets.length > previousTicketCount) {
-                playNotificationSound();
-            }
-            previousTicketCount = tickets.length;
+       function buildTicketHtml(t) {
+           return `
+               <div class="ticket">
+                   <p class="table-name">${escapeHtml(t.table_label || 'Table')}</p>
+                   <h2>${t.qty}x ${escapeHtml(t.item)}</h2>
+                   ${t.extras ? `<div class="extras">+ ${escapeHtml(t.extras)}</div>` : ""}
+                   ${t.note ? `<div class="note">💬 ${escapeHtml(t.note)}</div>` : ""}
+                   <button onclick="markDone('${t.order_id}', this)">✅ Ready</button>
+               </div>
+           `;
+       }
 
-            const grid = document.getElementById("ticketGrid");
-                    grid.innerHTML = tickets.length
-                        ? tickets.map(t => `
-                            <div class="ticket">
-                                <p class="table-name">${escapeHtml(t.table_label || 'Table')}</p>
-                                <h2>${t.qty}x ${escapeHtml(t.item)}</h2>
-                                ${t.extras ? `<div class="extras">+ ${escapeHtml(t.extras)}</div>` : ""}
-                                ${t.note ? `<div class="note">💬 ${escapeHtml(t.note)}</div>` : ""}
-                                <button onclick="markDone('${t.order_id}', this)">✅ Ready</button>
-                            </div>
-                        `).join("")
-                        : "<p style='color:#888; font-size:20px;'>No active tickets.</p>";
-                });
-        }
+       function loadTickets() {
+           fetch(`${PDA}/kitchen-tickets`)
+               .then(r => r.json())
+               .then(tickets => {
+                   if (tickets.length > previousTicketCount) {
+                       playNotificationSound();
+                   }
+                   previousTicketCount = tickets.length;
+
+                   const container = document.getElementById("categorySections");
+
+                   if (tickets.length === 0) {
+                       container.innerHTML = "<p class='empty-msg'>No active tickets.</p>";
+                       return;
+                   }
+
+                   const byCategory = {};
+                   tickets.forEach(t => {
+                       const cat = t.category || "other";
+                       if (!byCategory[cat]) byCategory[cat] = [];
+                       byCategory[cat].push(t);
+                   });
+
+                   const allCategories = [
+                       ...CATEGORY_ORDER.filter(c => byCategory[c]),
+                       ...Object.keys(byCategory).filter(c => !CATEGORY_ORDER.includes(c))
+                   ];
+
+                   container.innerHTML = allCategories.map(cat => `
+                       <div class="category-section">
+                           <div class="category-heading">
+                               ${categoryLabel(cat)}
+                               <span class="category-count">${byCategory[cat].length}</span>
+                           </div>
+                           <div class="ticket-list">
+                               ${byCategory[cat].map(buildTicketHtml).join("")}
+                           </div>
+                       </div>
+                   `).join("");
+               });
+       }
 
         function markDone(orderId, btn) {
             btn.disabled = true;
@@ -123,7 +192,7 @@
         }
 
         loadTickets();
-        setInterval(loadTickets, 3000);  // auto-refresh, same idea as the waiter page
+        setInterval(loadTickets, 3000);
 
         </script>
 </body>
