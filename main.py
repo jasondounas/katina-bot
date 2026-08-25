@@ -1134,6 +1134,48 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
     }
 
 
+@app.post("/sessions/{session_id}/approve-all")
+def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE session_id = %s AND status = 'PENDING_REVIEW'", (session_id,))
+    pending = cur.fetchall()
+
+    if not pending:
+        cur.close()
+        conn.close()
+        return {"session_id": session_id, "approved_count": 0}
+
+    table_label = session_id
+    cur.execute("SELECT table_id FROM sessions WHERE session_id = %s", (session_id,))
+    session_row = cur.fetchone()
+    if session_row:
+        cur.execute("SELECT display_label, table_id FROM tables WHERE table_id = %s", (session_row["table_id"],))
+        table_row = cur.fetchone()
+        if table_row:
+            table_label = table_row["display_label"] or table_row["table_id"]
+
+    now_utc = datetime.utcnow()
+    approved_ids = []
+    for order in pending:
+        extras_list = parse_extras(order.get("extras"))
+        extras_text = ", ".join(e.get("name", "") for e in extras_list)
+        send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label)
+        cur.execute(
+            "UPDATE orders SET status = 'APPROVED', handled_by = %s, approved_at = %s WHERE order_id = %s",
+            (waiter_name, now_utc, order["order_id"]),
+        )
+        approved_ids.append(order["order_id"])
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "approved all orders", session_id)
+
+    return {"session_id": session_id, "approved_count": len(approved_ids)}
+
+
 @app.post("/orders/{order_id}/reject")
 def reject_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
@@ -1201,6 +1243,25 @@ def mark_order_picked_up(order_id: str, _auth: None = Depends(verify_waiter), wa
     log_action(waiter_name, "picked up order", order_id)
 
     return {"order_id": order_id, "ready": False}
+
+
+@app.post("/sessions/{session_id}/pickup-all")
+def pickup_all_orders(session_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute(
+        "UPDATE orders SET ready = 0 WHERE session_id = %s AND status = 'APPROVED' AND ready = 1",
+        (session_id,),
+    )
+    picked = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    if picked:
+        log_action(waiter_name, "picked up all orders", session_id)
+
+    return {"session_id": session_id, "picked_up_count": picked}
 
 
 @app.delete("/orders/{order_id}")
