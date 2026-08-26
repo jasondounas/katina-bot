@@ -223,6 +223,7 @@
             font-weight: 700;
         }
         button.danger { background: #e74c3c; }
+        button.success { background: #1d7d72; }
         button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); display: flex; align-items: center; gap: 8px; }
         button.secondary { background: #f0f0f0; color: #555; }
 
@@ -278,6 +279,8 @@
             gap: 14px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         }
+        .table-row.clickable { cursor: pointer; }
+        .table-row.clickable:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
         .table-row .info .name { font-weight: 700; font-size: 15px; }
         .table-row .info .status { font-size: 12.5px; margin-top: 2px; font-weight: 600; }
         .table-row .info .status.occupied { color: #c0392b; }
@@ -475,6 +478,30 @@
             text-align: center;
             padding: 40px 0;
         }
+
+        .orders-modal {
+            background: white; border-radius: 24px; padding: 28px;
+            width: 92%; max-width: 520px; max-height: 85vh;
+            overflow-y: auto; position: relative;
+        }
+        .orders-modal h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+        .orders-close {
+            position: absolute; top: 24px; right: 24px;
+            cursor: pointer; font-size: 24px; color: #bbb;
+        }
+        .order-line {
+            border-bottom: 1px solid #f2f2f2;
+            padding: 14px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .order-line .info {
+            font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
+        }
+        .order-line .actions { flex-shrink: 0; }
+        .order-line .actions button { font-size: 12px; padding: 8px 12px; }
     </style>
 </head>
 <body>
@@ -547,6 +574,7 @@
         </div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="tablesTitle">Tables</span></span></div>
+        <p style="color:#999; font-size:13px; margin:-12px 0 16px;" id="tablesHint">Tap an occupied table to view and manage its orders.</p>
 
         <div class="add-form">
             <div class="form-row">
@@ -635,6 +663,13 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="ordersOverlay">
+        <div class="orders-modal">
+            <span class="orders-close" onclick="closeOrdersModal()">✕</span>
+            <div id="ordersModalContent"></div>
+        </div>
+    </div>
+
     <script>
         const BASE = "https://katina-bot.onrender.com";
         let editingItemId = null;
@@ -644,6 +679,7 @@
         let currentPeriod = "daily";
         let currentWaiterFilter = "";
         let chartInstances = {};
+        let currentOrdersTableId = null;
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -696,6 +732,7 @@
                 pending_orders: "Εκκρεμείς Παραγγελίες",
                 live_alerts: "Ζωντανές Ειδοποιήσεις",
                 tables: "Τραπέζια",
+                tables_hint: "Πατήστε σε κατειλημμένο τραπέζι για να δείτε και να διαχειριστείτε τις παραγγελίες του.",
                 recent_activity: "Πρόσφατη Δραστηριότητα",
                 menu_items: "Προϊόντα Μενού",
                 no_alerts: "Καμία ενεργή ειδοποίηση 🎉",
@@ -764,6 +801,16 @@
                 qty_axis: "Ποσότητα",
                 waiter_filter_label: "Σερβιτόρος:",
                 all_waiters: "Όλοι οι Σερβιτόροι",
+                orders_for_table: (l) => `Παραγγελίες — ${l}`,
+                bill_so_far: (a) => `💶 Λογαριασμός: €${a}`,
+                no_orders: "Δεν υπάρχουν παραγγελίες ακόμα.",
+                table_not_occupied: "Αυτό το τραπέζι είναι άδειο αυτή τη στιγμή.",
+                void: "Διαγραφή",
+                voided_label: "🚫 Διαγράφηκε",
+                void_reason_prompt: "Λόγος διαγραφής παραγγελίας:",
+                void_reason_required: "Απαιτείται λόγος.",
+                status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε", VOIDED: "Διαγράφηκε" },
+                by: (n) => `από ${n}`,
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -775,9 +822,12 @@
                     "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
+                    "approved all orders": "ενέκρινε όλες τις παραγγελίες",
                     "rejected order": "απέρριψε παραγγελία",
                     "deleted order": "διέγραψε παραγγελία",
+                    "voided order": "διέγραψε εγκεκριμένη παραγγελία",
                     "picked up order": "παρέλαβε παραγγελία",
+                    "picked up all orders": "παρέλαβε όλες τις παραγγελίες",
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
@@ -804,6 +854,7 @@
                 pending_orders: "Pending Orders",
                 live_alerts: "Live Alerts",
                 tables: "Tables",
+                tables_hint: "Tap an occupied table to view and manage its orders.",
                 recent_activity: "Recent Activity",
                 menu_items: "Menu Items",
                 no_alerts: "No active alerts 🎉",
@@ -872,6 +923,16 @@
                 qty_axis: "Quantity",
                 waiter_filter_label: "Waiter:",
                 all_waiters: "All Waiters",
+                orders_for_table: (l) => `Orders — ${l}`,
+                bill_so_far: (a) => `💶 Bill so far: €${a}`,
+                no_orders: "No orders yet.",
+                table_not_occupied: "This table is currently empty.",
+                void: "Void",
+                voided_label: "🚫 Voided",
+                void_reason_prompt: "Reason for voiding this order:",
+                void_reason_required: "A reason is required.",
+                status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED", VOIDED: "VOIDED" },
+                by: (n) => `by ${n}`,
                 action_labels: {}
             }
         };
@@ -892,6 +953,7 @@
                 loadTablesManagement();
                 loadAnalytics(currentPeriod);
                 if (activityLoaded) loadActivity();
+                if (currentOrdersTableId) openTableOrders(currentOrdersTableId);
             }
         }
 
@@ -907,6 +969,7 @@
             document.getElementById("headerTitle").innerText = t("dashboard_title");
             document.getElementById("liveAlertsTitle").innerText = t("live_alerts");
             document.getElementById("tablesTitle").innerText = t("tables");
+            document.getElementById("tablesHint").innerText = t("tables_hint");
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
             document.getElementById("menuItemsTitle").innerText = t("menu_items");
             document.getElementById("analyticsTitle").innerText = t("analytics");
@@ -1006,6 +1069,7 @@
             localStorage.removeItem("waiterToken");
             localStorage.removeItem("waiterName");
             document.getElementById("editOverlay").style.display = "none";
+            document.getElementById("ordersOverlay").style.display = "none";
             document.getElementById("loginScreen").style.display = "flex";
             document.getElementById("loginError").innerText = t("session_expired");
         }
@@ -1141,7 +1205,11 @@
             loadTablesManagement();
             loadMenuItems();
             loadAnalytics(currentPeriod);
-            setInterval(() => { loadStats(); loadAlerts(); }, 8000);
+            setInterval(() => {
+                loadStats();
+                loadAlerts();
+                if (currentOrdersTableId) openTableOrders(currentOrdersTableId, true);
+            }, 8000);
         }
 
         function toggleActivity() {
@@ -1483,15 +1551,16 @@
                 list.innerHTML = tables.map(tbl => {
                     const occupied = !!tbl.active_session_id;
                     const label = tbl.display_label || tbl.table_id;
+                    const rowClickAttr = occupied ? ` onclick="openTableOrders('${tbl.table_id}')"` : "";
                     return `
-                        <div class="table-row">
+                        <div class="table-row ${occupied ? 'clickable' : ''}"${rowClickAttr}>
                             <div class="info">
                                 <div class="name">${escapeHtml(label)}</div>
                                 <div class="status ${occupied ? 'occupied' : 'empty'}">${occupied ? t("occupied_status") : t("empty_status")}</div>
                             </div>
                             <div class="actions">
-                                <button class="secondary" onclick="renameTableFromDashboard('${tbl.table_id}', '${escapeHtml(label)}')">${t("rename")}</button>
-                                <button class="danger" onclick="deleteTableFromDashboard('${tbl.table_id}', ${occupied})">${t("delete")}</button>
+                                <button class="secondary" onclick="event.stopPropagation(); renameTableFromDashboard('${tbl.table_id}', '${escapeHtml(label)}')">${t("rename")}</button>
+                                <button class="danger" onclick="event.stopPropagation(); deleteTableFromDashboard('${tbl.table_id}', ${occupied})">${t("delete")}</button>
                             </div>
                         </div>
                     `;
@@ -1557,6 +1626,107 @@
                 .then(data => {
                     if (!data) return;
                     loadTablesManagement();
+                    loadStats();
+                });
+        }
+
+        function openTableOrders(tableId, silent) {
+            currentOrdersTableId = tableId;
+            const content = document.getElementById("ordersModalContent");
+
+            if (!silent) {
+                content.innerHTML = `<div class="loading-block"><div class="spinner"></div></div>`;
+                document.getElementById("ordersOverlay").style.display = "flex";
+            }
+
+            fetch(`${BASE}/tables`)
+                .then(r => r.json())
+                .then(tables => {
+                    const table = tables.find(tb => tb.table_id === tableId);
+                    const label = table ? (table.display_label || table.table_id) : tableId;
+                    const safeLabel = escapeHtml(label);
+
+                    if (!table || !table.active_session_id) {
+                        content.innerHTML = `
+                            <h2>${t("orders_for_table", safeLabel)}</h2>
+                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">${t("table_not_occupied")}</p>
+                        `;
+                        return;
+                    }
+
+                    fetch(`${BASE}/sessions/${table.active_session_id}`)
+                        .then(r => r.json())
+                        .then(session => {
+                            if (session.error) {
+                                content.innerHTML = `<h2>${t("orders_for_table", safeLabel)}</h2><p style="color:#999;">${t("table_not_occupied")}</p>`;
+                                return;
+                            }
+
+                            fetch(`${BASE}/sessions/${session.session_id}/orders`)
+                                .then(r => r.json())
+                                .then(orders => {
+                                    const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌", VOIDED: "⛔" };
+
+                                    const billTotal = orders
+                                        .filter(o => o.status === "APPROVED")
+                                        .reduce((sum, o) => sum + (o.price * o.qty), 0);
+
+                                    const ordersHtml = orders.length
+                                        ? orders.map(o => {
+                                            const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
+                                            let actionsHtml = "";
+                                            if (o.status === "APPROVED" && !session.is_paid) {
+                                                actionsHtml = `<button class="danger" onclick="voidOrderFromDashboard('${o.order_id}')">${t("void")}</button>`;
+                                            } else {
+                                                actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
+                                            }
+                                            return `
+                                                <div class="order-line">
+                                                    <div class="info">
+                                                        ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
+                                                        ${extrasList ? `<div style="font-size:11.5px; color:#1d5fd7; margin-top:2px;">+ ${extrasList}</div>` : ""}
+                                                        ${o.note ? `<div style="font-size:13px; color:#e74c3c; font-weight:700; font-style:italic; margin-top:3px;">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                                    </div>
+                                                    <div class="actions">${actionsHtml}</div>
+                                                </div>
+                                            `;
+                                        }).join("")
+                                        : `<p style="color:#999; padding:10px 0;">${t("no_orders")}</p>`;
+
+                                    content.innerHTML = `
+                                        <h2>${t("orders_for_table", safeLabel)}</h2>
+                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
+                                        ${ordersHtml}
+                                    `;
+                                });
+                        });
+                });
+        }
+
+        function closeOrdersModal() {
+            document.getElementById("ordersOverlay").style.display = "none";
+            currentOrdersTableId = null;
+        }
+
+        function voidOrderFromDashboard(orderId) {
+            const reason = prompt(t("void_reason_prompt"));
+            if (reason === null) return;
+            if (!reason.trim()) {
+                alert(t("void_reason_required"));
+                return;
+            }
+
+            authFetch(`${BASE}/orders/${orderId}/void?reason=${encodeURIComponent(reason)}`, {
+                method: "POST"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    openTableOrders(currentOrdersTableId);
                     loadStats();
                 });
         }
