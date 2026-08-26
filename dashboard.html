@@ -502,6 +502,12 @@
         }
         .order-line .actions { flex-shrink: 0; }
         .order-line .actions button { font-size: 12px; padding: 8px 12px; }
+
+        .mode-desc {
+            font-size: 12px;
+            color: #999;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -538,6 +544,16 @@
 
         <div class="section-title"><span><span class="bar"></span><span id="liveAlertsTitle">Live Alerts</span></span></div>
         <div id="alertsList"><div class="loading-block"><div class="spinner"></div></div></div>
+
+        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="settingsTitle">Settings</span></span></div>
+        <div class="add-form">
+            <label id="tableStatusModeLabel" style="font-size:13px; font-weight:700; color:#555; display:block; margin-bottom:10px;">Table Status Display</label>
+            <div class="period-toggle">
+                <button id="modeSimpleBtn" onclick="setTableStatusMode('simple')">Simple</button>
+                <button id="modeDetailedBtn" onclick="setTableStatusMode('detailed')">Detailed</button>
+            </div>
+            <p class="mode-desc" id="modeDescription"></p>
+        </div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="analyticsTitle">Analytics</span></span></div>
 
@@ -680,6 +696,7 @@
         let currentWaiterFilter = "";
         let chartInstances = {};
         let currentOrdersTableId = null;
+        let currentTableStatusMode = "simple";
 
         let currentLang = localStorage.getItem("katinaLang") || "gr";
 
@@ -811,6 +828,12 @@
                 void_reason_required: "Απαιτείται λόγος.",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε", VOIDED: "Διαγράφηκε" },
                 by: (n) => `από ${n}`,
+                settings: "Ρυθμίσεις",
+                table_status_mode_label: "Εμφάνιση Κατάστασης Τραπεζιών",
+                mode_simple: "Απλή",
+                mode_detailed: "Αναλυτική",
+                mode_simple_desc: "Άδειο / Απλήρωτο / Πληρωμένο",
+                mode_detailed_desc: "Άδειο / Κατειλημμένο / Απλήρωτο / Πληρωμένο",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -832,7 +855,8 @@
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
                     "moved table": "μετακίνησε τραπέζι",
-                    "cleared kitchen queue": "καθάρισε την ουρά κουζίνας"
+                    "cleared kitchen queue": "καθάρισε την ουρά κουζίνας",
+                    "changed table status mode": "άλλαξε τη λειτουργία κατάστασης τραπεζιών"
                 }
             },
             en: {
@@ -933,6 +957,12 @@
                 void_reason_required: "A reason is required.",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED", VOIDED: "VOIDED" },
                 by: (n) => `by ${n}`,
+                settings: "Settings",
+                table_status_mode_label: "Table Status Display",
+                mode_simple: "Simple",
+                mode_detailed: "Detailed",
+                mode_simple_desc: "Empty / Unpaid / Paid",
+                mode_detailed_desc: "Empty / Occupied / Unpaid / Paid",
                 action_labels: {}
             }
         };
@@ -954,6 +984,7 @@
                 loadAnalytics(currentPeriod);
                 if (activityLoaded) loadActivity();
                 if (currentOrdersTableId) openTableOrders(currentOrdersTableId);
+                updateModeButtons();
             }
         }
 
@@ -968,6 +999,10 @@
             document.getElementById("unlockBtn").innerText = t("unlock");
             document.getElementById("headerTitle").innerText = t("dashboard_title");
             document.getElementById("liveAlertsTitle").innerText = t("live_alerts");
+            document.getElementById("settingsTitle").innerText = t("settings");
+            document.getElementById("tableStatusModeLabel").innerText = t("table_status_mode_label");
+            document.getElementById("modeSimpleBtn").innerText = t("mode_simple");
+            document.getElementById("modeDetailedBtn").innerText = t("mode_detailed");
             document.getElementById("tablesTitle").innerText = t("tables");
             document.getElementById("tablesHint").innerText = t("tables_hint");
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
@@ -1199,12 +1234,44 @@
             return select.value;
         }
 
+        function loadSettings() {
+            fetch(`${BASE}/settings`)
+                .then(r => r.json())
+                .then(data => {
+                    currentTableStatusMode = (data && data.table_status_mode) || "simple";
+                    updateModeButtons();
+                });
+        }
+
+        function updateModeButtons() {
+            document.getElementById("modeSimpleBtn").classList.toggle("active", currentTableStatusMode === "simple");
+            document.getElementById("modeDetailedBtn").classList.toggle("active", currentTableStatusMode === "detailed");
+            document.getElementById("modeDescription").innerText = currentTableStatusMode === "detailed" ? t("mode_detailed_desc") : t("mode_simple_desc");
+        }
+
+        function setTableStatusMode(mode) {
+            authFetch(`${BASE}/settings/table-status-mode?mode=${mode}`, {
+                method: "POST"
+            })
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    currentTableStatusMode = data.table_status_mode;
+                    updateModeButtons();
+                });
+        }
+
         function init() {
             loadStats();
             loadAlerts();
             loadTablesManagement();
             loadMenuItems();
             loadAnalytics(currentPeriod);
+            loadSettings();
             setInterval(() => {
                 loadStats();
                 loadAlerts();
