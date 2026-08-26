@@ -148,6 +148,12 @@ def init_db():
             available INTEGER DEFAULT 1
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
     conn.commit()
 
     for column_def in ["waiter_called INTEGER DEFAULT 0", "payment_requested INTEGER DEFAULT 0"]:
@@ -220,6 +226,11 @@ def init_db():
     except psycopg2.errors.DuplicateTable:
         conn.rollback()
 
+    cur.execute(
+        "INSERT INTO settings (key, value) VALUES ('table_status_mode', 'simple') ON CONFLICT (key) DO NOTHING"
+    )
+    conn.commit()
+
     seed_items = [
         ("coke", "coke", 3.50, "Ice-cold classic, served in a chilled glass", "https://katina-bot-2.onrender.com/image/coke.jpg", "drinks"),
         ("burger", "burger", 9.90, "Juicy beef patty, cheddar, house sauce, brioche bun", "https://katina-bot-2.onrender.com/image/burger.jpg", "burgers"),
@@ -247,6 +258,37 @@ def root():
 @app.get("/verify-token")
 def verify_token(_auth: None = Depends(verify_waiter)):
     return {"valid": True}
+
+
+@app.get("/settings")
+def get_settings():
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT key, value FROM settings")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {row["key"]: row["value"] for row in rows}
+
+
+@app.post("/settings/table-status-mode")
+def set_table_status_mode(mode: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    if mode not in ("simple", "detailed"):
+        return {"error": "Mode must be 'simple' or 'detailed'"}
+
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute(
+        "INSERT INTO settings (key, value) VALUES ('table_status_mode', %s) ON CONFLICT (key) DO UPDATE SET value = %s",
+        (mode, mode),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "changed table status mode", mode)
+
+    return {"table_status_mode": mode}
 
 
 @app.get("/menu")
@@ -656,12 +698,23 @@ def get_session(session_id: str):
     cur = get_cursor(conn)
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
+
+    if session is None:
+        cur.close()
+        conn.close()
+        return {"error": "Session not found"}
+
+    cur.execute(
+        "SELECT COALESCE(SUM(price * qty), 0) as bill FROM orders WHERE session_id = %s AND status = 'APPROVED'",
+        (session_id,),
+    )
+    bill_total = cur.fetchone()["bill"]
     cur.close()
     conn.close()
 
-    if session is None:
-        return {"error": "Session not found"}
-    return dict(session)
+    result = dict(session)
+    result["bill_total"] = float(bill_total)
+    return result
 
 
 @app.get("/sessions")
