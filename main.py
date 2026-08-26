@@ -1277,6 +1277,44 @@ def pickup_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wai
     return {"session_id": session_id, "picked_up_count": picked}
 
 
+@app.post("/orders/{order_id}/void")
+def void_order(order_id: str, reason: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
+    if not reason or not reason.strip():
+        return {"error": "A reason is required to void an order"}
+
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+    order = cur.fetchone()
+
+    if order is None:
+        cur.close()
+        conn.close()
+        return {"error": "Order not found"}
+
+    if order["status"] != "APPROVED":
+        cur.close()
+        conn.close()
+        return {"error": "Only approved orders can be voided"}
+
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (order["session_id"],))
+    session = cur.fetchone()
+
+    if not session or session["status"] != "OPEN" or session["is_paid"]:
+        cur.close()
+        conn.close()
+        return {"error": "Cannot void an order after the table has been paid"}
+
+    cur.execute("UPDATE orders SET status = 'VOIDED', handled_by = %s WHERE order_id = %s", (waiter_name, order_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action(waiter_name, "voided order", f"{order_id} — {reason.strip()}")
+
+    return {"order_id": order_id, "status": "VOIDED"}
+
+
 @app.delete("/orders/{order_id}")
 def delete_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_name: str = Depends(get_waiter_name)):
     conn = get_connection()
