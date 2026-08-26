@@ -564,7 +564,7 @@
                 move_no_empty: "Δεν υπάρχουν άδεια τραπέζια αυτή τη στιγμή.",
                 logout: "Αποσύνδεση",
                 logout_confirm: "Αποσύνδεση από αυτή τη συσκευή;",
-                status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε" },
+                status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε", VOIDED: "Διαγράφηκε" },
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
                 delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
@@ -582,6 +582,7 @@
                     "approved all orders": "ενέκρινε όλες τις παραγγελίες",
                     "rejected order": "απέρριψε παραγγελία",
                     "deleted order": "διέγραψε παραγγελία",
+                    "voided order": "διέγραψε εγκεκριμένη παραγγελία",
                     "picked up order": "παρέλαβε παραγγελία",
                     "picked up all orders": "παρέλαβε όλες τις παραγγελίες",
                     "added menu item": "πρόσθεσε προϊόν μενού",
@@ -653,7 +654,7 @@
                 move_no_empty: "No empty tables right now.",
                 logout: "Logout",
                 logout_confirm: "Log out on this device?",
-                status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED" },
+                status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED", VOIDED: "VOIDED" },
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
                 delete_session_confirm: "Delete this session? This cancels all its orders.",
@@ -1172,7 +1173,7 @@
                             fetch(`${BASE}/sessions/${session.session_id}/orders`)
                                 .then(r => r.json())
                                 .then(orders => {
-                                    const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌" };
+                                    const statusEmoji = { PENDING_REVIEW: "⏳", APPROVED: "✅", REJECTED: "🚫", CANCELLED: "❌", VOIDED: "⛔" };
 
                                     const billTotal = orders
                                         .filter(o => o.status === "APPROVED")
