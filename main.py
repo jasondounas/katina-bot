@@ -98,6 +98,16 @@ def format_order(order_dict):
     return order_dict
 
 
+def get_table_status_mode():
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT value FROM settings WHERE key = 'table_status_mode'")
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row["value"] if row and row["value"] in ("simple", "detailed") else "simple"
+
+
 def init_db():
     conn = get_connection()
     cur = get_cursor(conn)
@@ -201,6 +211,12 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE orders ADD COLUMN approved_at TIMESTAMP")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE orders ADD COLUMN paid INTEGER DEFAULT 0")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
         conn.rollback()
@@ -335,7 +351,7 @@ def get_revenue_stats(_auth: None = Depends(verify_waiter)):
         SELECT COALESCE(SUM(o.price * o.qty), 0) as unpaid
         FROM orders o
         JOIN sessions s ON o.session_id = s.session_id
-        WHERE o.status = 'APPROVED' AND s.status = 'OPEN' AND s.is_paid = 0
+        WHERE o.status = 'APPROVED' AND o.paid = 0 AND s.status = 'OPEN'
     """)
     unpaid_amount = cur.fetchone()["unpaid"]
 
@@ -672,10 +688,26 @@ def release_table(table_id: str, _auth: None = Depends(verify_waiter), waiter_na
         conn.close()
         return {"error": "Table has no active session"}
 
-    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (table["active_session_id"],))
+    session_id = table["active_session_id"]
+    cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     session = cur.fetchone()
 
-    if session and session["status"] not in ("CLOSED", "DELETED"):
+    mode = get_table_status_mode()
+
+    if mode == "detailed" and session and session["status"] == "OPEN":
+        cur.execute(
+            "SELECT COALESCE(SUM(price * qty), 0) as bal FROM orders WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
+            (session_id,),
+        )
+        balance = cur.fetchone()["bal"]
+
+        if balance > 0:
+            cur.close()
+            conn.close()
+            return {"error": f"Cannot release — outstanding balance of €{balance:.2f}"}
+
+        cur.execute("UPDATE sessions SET status = 'CLOSED' WHERE session_id = %s", (session_id,))
+    elif session and session["status"] not in ("CLOSED", "DELETED"):
         cur.close()
         conn.close()
         return {"error": "Session must be closed before releasing the table"}
@@ -709,11 +741,19 @@ def get_session(session_id: str):
         (session_id,),
     )
     bill_total = cur.fetchone()["bill"]
+
+    cur.execute(
+        "SELECT COALESCE(SUM(price * qty), 0) as bal FROM orders WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
+        (session_id,),
+    )
+    unpaid_balance = cur.fetchone()["bal"]
+
     cur.close()
     conn.close()
 
     result = dict(session)
     result["bill_total"] = float(bill_total)
+    result["unpaid_balance"] = float(unpaid_balance)
     return result
 
 
@@ -938,6 +978,29 @@ def mark_paid(session_id: str, _auth: None = Depends(verify_waiter), waiter_name
         conn.close()
         return {"error": "Session not found"}
 
+    mode = get_table_status_mode()
+
+    if mode == "detailed":
+        cur.execute(
+            "UPDATE orders SET paid = 1 WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
+            (session_id,),
+        )
+        cur.execute(
+            "UPDATE sessions SET payment_requested = 0 WHERE session_id = %s",
+            (session_id,),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        log_action(waiter_name, "marked orders as paid", session_id)
+
+        return {"session_id": session_id, "marked_paid": True, "released": False}
+
+    cur.execute(
+        "UPDATE orders SET paid = 1 WHERE session_id = %s AND status = 'APPROVED' AND paid = 0",
+        (session_id,),
+    )
     cur.execute(
         "UPDATE sessions SET is_paid = 1, payment_requested = 0, status = 'CLOSED' WHERE session_id = %s",
         (session_id,),
@@ -1101,7 +1164,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
 
     order_id = f"o_{uuid.uuid4().hex[:8]}"
     cur.execute(
-        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note, extras, ready) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0)",
+        "INSERT INTO orders (order_id, session_id, item, qty, price, status, idempotency_key, note, extras, ready, paid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0)",
         (order_id, session_id, item, qty, unit_price, "PENDING_REVIEW", idempotency_key, note, json.dumps(extras_detail)),
     )
     conn.commit()
@@ -1350,13 +1413,18 @@ def void_order(order_id: str, reason: str, _auth: None = Depends(verify_waiter),
         conn.close()
         return {"error": "Only approved orders can be voided"}
 
+    if order.get("paid"):
+        cur.close()
+        conn.close()
+        return {"error": "Cannot void an order that has already been paid"}
+
     cur.execute("SELECT * FROM sessions WHERE session_id = %s", (order["session_id"],))
     session = cur.fetchone()
 
-    if not session or session["status"] != "OPEN" or session["is_paid"]:
+    if not session or session["status"] != "OPEN":
         cur.close()
         conn.close()
-        return {"error": "Cannot void an order after the table has been paid"}
+        return {"error": "Cannot void an order after the table has been released"}
 
     cur.execute("UPDATE orders SET status = 'VOIDED', handled_by = %s WHERE order_id = %s", (waiter_name, order_id))
     conn.commit()
