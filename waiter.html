@@ -300,6 +300,7 @@
         .stat.paid { background: #e6f5f3; color: #1d7d72; }
         .stat.unpaid { background: #fce8e6; color: #c0392b; }
         .stat.empty-stat { background: #e6f5f3; color: #1d7d72; }
+        .stat.occupied-stat { background: #e6f0fc; color: #1d5fd7; }
 
         .overlay {
             display: none;
@@ -484,6 +485,7 @@
         let previousPendingCounts = {};
         let previousReadyCounts = {};
         let hasLoadedTablesOnce = false;
+        let tableStatusMode = "simple";
 
         let audioCtx = null;
 
@@ -522,6 +524,7 @@
                 empty: "🟢 Άδειο",
                 paid: "💰 Πληρωμένο",
                 unpaid: "❌ Απλήρωτο",
+                occupied: "🔵 Κατειλημμένο",
                 people: (n) => `👥 ${n}`,
                 pending_short: (n) => `🧾 ${n} εκκρ.`,
                 calling_waiter: "🔔 ΚΑΛΕΙ ΣΕΡΒΙΤΟΡΟ",
@@ -588,7 +591,8 @@
                     "added menu item": "πρόσθεσε προϊόν μενού",
                     "updated menu item": "ενημέρωσε προϊόν μενού",
                     "deleted menu item": "διέγραψε προϊόν μενού",
-                    "moved table": "μετακίνησε τραπέζι"
+                    "moved table": "μετακίνησε τραπέζι",
+                    "changed table status mode": "άλλαξε τη λειτουργία κατάστασης τραπεζιών"
                 }
             },
             en: {
@@ -612,6 +616,7 @@
                 empty: "🟢 Empty",
                 paid: "💰 Paid",
                 unpaid: "❌ Unpaid",
+                occupied: "🔵 Occupied",
                 people: (n) => `👥 ${n}`,
                 pending_short: (n) => `🧾 ${n} pending`,
                 calling_waiter: "🔔 CALLING WAITER",
@@ -838,6 +843,14 @@
             return T[currentLang].action_labels[action] || action;
         }
 
+        function getStatusStat(session) {
+            if (session.is_paid) return { cls: "paid", label: t("paid") };
+            if (tableStatusMode === "detailed" && (session.bill_total || 0) === 0) {
+                return { cls: "occupied-stat", label: t("occupied") };
+            }
+            return { cls: "unpaid", label: t("unpaid") };
+        }
+
         function openActivityLog() {
             document.getElementById("logDrawerTitle").innerText = t("activity_log");
             document.getElementById("drawerOverlay").classList.add("open");
@@ -926,7 +939,10 @@
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
                 fetch(`${BASE}/orders/ready`).then(r => r.json()),
-            ]).then(([tables, pendingOrders, readyOrders]) => {
+                fetch(`${BASE}/settings`).then(r => r.json()).catch(() => ({})),
+            ]).then(([tables, pendingOrders, readyOrders, settings]) => {
+
+                tableStatusMode = (settings && settings.table_status_mode) || "simple";
 
                 window._tablesCache = tables;
                 document.getElementById("tableCount").innerText = tables.length;
@@ -1042,6 +1058,8 @@
 
                         const moveIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openMovePicker('${tbl.table_id}', '${safeLabel}')">⇄</span>`;
 
+                        const statusStat = getStatusStat(session);
+
                         grid.innerHTML += `
                             <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${tbl.table_id}')">
                                 <div class="icon-row">${moveIcon}${historyIcon}</div>
@@ -1050,7 +1068,7 @@
                                     <h3>${safeLabel}</h3>
                                     <div class="card-stats">
                                         <span class="stat">${t("people", session.party_size)}</span>
-                                        <span class="stat ${session.is_paid ? 'paid' : 'unpaid'}">${session.is_paid ? t("paid") : t("unpaid")}</span>
+                                        <span class="stat ${statusStat.cls}">${statusStat.label}</span>
                                         ${pending > 0 ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
                                     </div>
                                 </div>
@@ -1231,12 +1249,14 @@
                                         ${readyCount > 0 ? `<button class="success" onclick="pickupAll('${session.session_id}')">${t("pickup_all")}</button>` : ""}
                                     `;
 
+                                    const modalStatusStat = getStatusStat(session);
+
                                     content.innerHTML = `
                                         <h2>${safeLabel}${renameIcon}</h2>
                                         <p style="color:#777; margin:6px 0 12px;">
                                             ${t("people", session.party_size)}
                                             <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit_party_size")}</span>
-                                            &nbsp;|&nbsp; ${session.is_paid ? t("paid") : t("unpaid")}
+                                            &nbsp;|&nbsp; ${modalStatusStat.label}
                                         </p>
                                         <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
                                         <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
