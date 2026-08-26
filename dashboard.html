@@ -833,7 +833,7 @@
                 mode_simple: "Απλή",
                 mode_detailed: "Αναλυτική",
                 mode_simple_desc: "Άδειο / Απλήρωτο / Πληρωμένο",
-                mode_detailed_desc: "Άδειο / Κατειλημμένο / Απλήρωτο / Πληρωμένο",
+                mode_detailed_desc: "Άδειο / Κατειλημμένο / Απλήρωτο — Πληρωμή δεν απελευθερώνει το τραπέζι αυτόματα",
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -842,6 +842,7 @@
                     "opened session": "άνοιξε συνεδρία",
                     "updated party size": "ενημέρωσε αριθμό ατόμων",
                     "deleted session": "διέγραψε συνεδρία",
+                    "marked orders as paid": "σήμανε παραγγελίες ως πληρωμένες",
                     "marked paid and released table": "σήμανε ως πληρωμένο και απελευθέρωσε τραπέζι",
                     "acknowledged call": "επιβεβαίωσε κλήση",
                     "approved order": "ενέκρινε παραγγελία",
@@ -962,7 +963,7 @@
                 mode_simple: "Simple",
                 mode_detailed: "Detailed",
                 mode_simple_desc: "Empty / Unpaid / Paid",
-                mode_detailed_desc: "Empty / Occupied / Unpaid / Paid",
+                mode_detailed_desc: "Empty / Occupied / Unpaid — paying does not auto-release the table",
                 action_labels: {}
             }
         };
@@ -1742,8 +1743,10 @@
                                         ? orders.map(o => {
                                             const extrasList = (o.extras || []).map(e => escapeHtml(e.name)).join(", ");
                                             let actionsHtml = "";
-                                            if (o.status === "APPROVED" && !session.is_paid) {
+                                            if (o.status === "APPROVED" && !o.paid && session.status === "OPEN") {
                                                 actionsHtml = `<button class="danger" onclick="voidOrderFromDashboard('${o.order_id}')">${t("void")}</button>`;
+                                            } else if (o.status === "APPROVED" && o.paid) {
+                                                actionsHtml = `<span style="font-size:12px;color:#1d7d72;font-weight:700;">${t("paid_tag") || "Paid"}</span>`;
                                             } else {
                                                 actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
                                             }
