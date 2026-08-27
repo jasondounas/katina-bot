@@ -772,7 +772,7 @@
                 session_expired: "Η σύνδεσή σας έληξε. Παρακαλώ συνδεθείτε ξανά.",
                 dashboard_title: "Katina — Πίνακας Ελέγχου",
                 logged_in_as: (n) => `Συνδεδεμένος ως ${n}`,
-                total_revenue: "Συνολικά Έσοδα",
+                todays_revenue: "Έσοδα Ημέρας",
                 currently_unpaid: "Απλήρωτο Τώρα",
                 total_tables: "Σύνολο Τραπεζιών",
                 occupied: "Κατειλημμένα",
@@ -905,7 +905,7 @@
                 session_expired: "Your session expired. Please log in again.",
                 dashboard_title: "Katina — Dashboard",
                 logged_in_as: (n) => `Logged in as ${n}`,
-                total_revenue: "Total Revenue",
+                todays_revenue: "Today's Revenue",
                 currently_unpaid: "Currently Unpaid",
                 total_tables: "Total Tables",
                 occupied: "Occupied",
@@ -1353,10 +1353,12 @@
                 fetch(`${BASE}/sessions`).then(r => r.json()),
                 authFetch(`${BASE}/revenue-stats`).then(r => r ? r.json() : null),
                 fetch(`${BASE}/settings`).then(r => r.json()).catch(() => ({})),
-            ]).then(([tables, pending, sessions, revenue, settings]) => {
+                authFetch(`${BASE}/analytics?period=daily`).then(r => r ? r.json() : null),
+            ]).then(([tables, pending, sessions, revenue, settings, dailyAnalytics]) => {
                 if (!revenue) return;
 
                 currentTableStatusMode = (settings && settings.table_status_mode) || "simple";
+                const todaysRevenue = dailyAnalytics ? dailyAnalytics.window_summary.total_revenue : 0;
 
                 let extraCardsHtml;
                 if (currentTableStatusMode === "detailed") {
@@ -1374,7 +1376,7 @@
                 }
 
                 document.getElementById("statsRow").innerHTML = `
-                    <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">${t("total_revenue")}</div></div>
+                    <div class="stat-card money"><div class="num">€${todaysRevenue.toFixed(2)}</div><div class="label">${t("todays_revenue")}</div></div>
                     <div class="stat-card money-outstanding"><div class="num">€${revenue.unpaid_amount.toFixed(2)}</div><div class="label">${t("currently_unpaid")}</div></div>
                     <div class="stat-card"><div class="num">${tables.length}</div><div class="label">${t("total_tables")}</div></div>
                     ${extraCardsHtml}
