@@ -40,6 +40,7 @@ class MenuItemCreate(BaseModel):
     image: str = ""
     category: str = "other"
     extras: List[MenuItemExtra] = []
+    stock: Optional[int] = None
 
 
 class MenuItemUpdate(BaseModel):
@@ -50,6 +51,8 @@ class MenuItemUpdate(BaseModel):
     available: int = None
     category: str = None
     extras: Optional[List[MenuItemExtra]] = None
+    stock: Optional[int] = None
+    clear_stock: bool = False
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -240,6 +243,12 @@ def init_db():
         conn.rollback()
 
     try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN stock INTEGER")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
         cur.execute("""
             CREATE UNIQUE INDEX idx_orders_idempotency
             ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL
@@ -335,6 +344,7 @@ def get_menu():
             "image": item["image"],
             "category": item["category"] or "other",
             "extras": parse_extras(item.get("extras")),
+            "stock": item.get("stock"),
         }
     return menu
 
@@ -480,8 +490,8 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
     extras_json = json.dumps([e.dict() for e in payload.extras])
 
     cur.execute(
-        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras) VALUES (%s, %s, %s, %s, %s, 1, %s, %s)",
-        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json),
+        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras, stock) VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s)",
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json, payload.stock),
     )
     conn.commit()
     cur.close()
@@ -523,8 +533,15 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
 
     extras_json = json.dumps([e.dict() for e in payload.extras]) if payload.extras is not None else item["extras"]
 
+    if payload.clear_stock:
+        new_stock = None
+    elif payload.stock is not None:
+        new_stock = payload.stock
+    else:
+        new_stock = item["stock"]
+
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, stock=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
@@ -533,6 +550,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
             payload.available if payload.available is not None else item["available"],
             payload.category if payload.category is not None else item["category"],
             extras_json,
+            new_stock,
             item_id,
         ),
     )
@@ -1280,6 +1298,13 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         "UPDATE orders SET status = %s, handled_by = %s, approved_at = %s WHERE order_id = %s",
         ("APPROVED", waiter_name, now_utc, order_id),
     )
+
+    if menu_row and menu_row.get("stock") is not None:
+        cur.execute(
+            "UPDATE menu_items SET stock = stock - %s WHERE item_id = %s",
+            (order["qty"], order["item"]),
+        )
+
     conn.commit()
     cur.close()
     conn.close()
@@ -1326,6 +1351,11 @@ def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wa
             "UPDATE orders SET status = 'APPROVED', handled_by = %s, approved_at = %s WHERE order_id = %s",
             (waiter_name, now_utc, order["order_id"]),
         )
+        if menu_row and menu_row.get("stock") is not None:
+            cur.execute(
+                "UPDATE menu_items SET stock = stock - %s WHERE item_id = %s",
+                (order["qty"], order["item"]),
+            )
         approved_ids.append(order["order_id"])
 
     conn.commit()
