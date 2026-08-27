@@ -24,6 +24,7 @@ PDA_URL = "https://katina-bot-1.onrender.com"
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 WAITER_TOKEN = os.environ.get("WAITER_TOKEN", "changeme")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "changeme_admin")
 
 
 class MenuItemExtra(BaseModel):
@@ -52,8 +53,13 @@ class MenuItemUpdate(BaseModel):
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
-    if x_waiter_token != WAITER_TOKEN:
+    if x_waiter_token not in (WAITER_TOKEN, ADMIN_TOKEN):
         raise HTTPException(status_code=401, detail="Invalid or missing waiter token")
+
+
+def verify_admin(x_waiter_token: str = Header(None)):
+    if x_waiter_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin token")
 
 
 def get_waiter_name(x_waiter_name: str = Header(None)) -> str:
@@ -272,8 +278,13 @@ def root():
 
 
 @app.get("/verify-token")
-def verify_token(_auth: None = Depends(verify_waiter)):
-    return {"valid": True}
+def verify_token(x_waiter_token: str = Header(None), _auth: None = Depends(verify_waiter)):
+    return {"valid": True, "role": "admin" if x_waiter_token == ADMIN_TOKEN else "waiter"}
+
+
+@app.get("/verify-admin-token")
+def verify_admin_token(_auth: None = Depends(verify_admin)):
+    return {"valid": True, "role": "admin"}
 
 
 @app.get("/settings")
@@ -399,8 +410,9 @@ def get_analytics(period: str = "daily", waiter: str = None, _auth: None = Depen
     """, trend_params)
     trend_rows = cur.fetchall()
 
+    items_date_clause = "" if period == "total" else " AND o.approved_at IS NOT NULL AND o.approved_at >= %s"
     items_waiter_clause = " AND o.handled_by = %s" if waiter else ""
-    items_params = [window_start] + ([waiter] if waiter else [])
+    items_params = ([] if period == "total" else [window_start]) + ([waiter] if waiter else [])
     cur.execute(f"""
         SELECT o.item,
                COALESCE(m.category, 'other') as category,
@@ -408,20 +420,21 @@ def get_analytics(period: str = "daily", waiter: str = None, _auth: None = Depen
                COALESCE(SUM(o.price * o.qty), 0) as revenue
         FROM orders o
         LEFT JOIN menu_items m ON o.item = m.item_id
-        WHERE o.status = 'APPROVED' AND o.approved_at IS NOT NULL AND o.approved_at >= %s{items_waiter_clause}
+        WHERE o.status = 'APPROVED'{items_date_clause}{items_waiter_clause}
         GROUP BY o.item, m.category
         ORDER BY qty_sold DESC
     """, items_params)
     top_items_rows = cur.fetchall()
 
+    waiters_date_clause = "" if period == "total" else " AND approved_at IS NOT NULL AND approved_at >= %s"
     waiters_extra_clause = " AND handled_by = %s" if waiter else ""
-    waiters_params = [window_start] + ([waiter] if waiter else [])
+    waiters_params = ([] if period == "total" else [window_start]) + ([waiter] if waiter else [])
     cur.execute(f"""
         SELECT handled_by as waiter_name,
                COUNT(*) as orders_count,
                COALESCE(SUM(price * qty), 0) as revenue
         FROM orders
-        WHERE status = 'APPROVED' AND approved_at IS NOT NULL AND approved_at >= %s AND handled_by IS NOT NULL{waiters_extra_clause}
+        WHERE status = 'APPROVED'{waiters_date_clause} AND handled_by IS NOT NULL{waiters_extra_clause}
         GROUP BY handled_by
         ORDER BY revenue DESC
     """, waiters_params)
