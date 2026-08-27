@@ -1109,7 +1109,7 @@
             }
             if (!code) return;
 
-            fetch(`${BASE}/verify-token`, {
+            fetch(`${BASE}/verify-admin-token`, {
                 headers: { "X-Waiter-Token": code }
             }).then(r => {
                 if (r.status === 401) {
