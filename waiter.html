@@ -53,7 +53,7 @@
         }
         .toast.called { border-left-color: #f39c12; }
         .toast.pay { border-left-color: #7c3aed; }
-        .toast.ready { border-left-color: #1d7d72; }
+        .toast.ready { border-left-color: #d81b60; }
         .toast .toast-icon { font-size: 22px; }
         .toast .toast-text { flex: 1; }
         .toast .toast-title { font-weight: 800; font-size: 14px; }
@@ -282,7 +282,7 @@
         .card-alert.called { background: #f39c12; }
         .card-alert.pay { background: #7c3aed; }
         .card-alert.pending { background: #ff6b35; }
-        .card-alert.ready { background: #1d7d72; }
+        .card-alert.ready { background: #d81b60; }
         .card-alert.release { background: #999; }
 
         .card-body { padding: 18px; border-top: 5px solid #eee; }
@@ -1219,7 +1219,7 @@
                                             }
 
                                             const readyTag = (o.status === "APPROVED" && o.ready)
-                                                ? `<div style="font-size:11.5px; color:#1d7d72; font-weight:700; margin-top:2px;">${t("ready_tag")}</div>`
+                                                ? `<div style="font-size:11.5px; color:#d81b60; font-weight:700; margin-top:2px;">${t("ready_tag")}</div>`
                                                 : "";
 
                                             return `
