@@ -277,6 +277,7 @@
         }
         .alert-row.called { border-left-color: #f39c12; }
         .alert-row.pay { border-left-color: #7c3aed; }
+        .alert-row.stock { border-left-color: #c0392b; }
         .alert-row .table-name { font-weight: 800; font-size: 15px; }
         .alert-row .type { font-size: 13px; color: #777; margin-top: 2px; }
 
@@ -321,6 +322,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         }
         .menu-item-row.unavailable { opacity: 0.5; }
+        .menu-item-row.out-of-stock { border: 1.5px solid #e74c3c; }
         .item-thumb {
             width: 54px; height: 54px;
             border-radius: 12px;
@@ -333,6 +335,9 @@
         .item-info .price { color: #ff6b35; font-weight: 700; font-size: 13px; margin-top: 2px; }
         .item-info .desc { font-size: 12px; color: #999; margin-top: 2px; }
         .item-info .extras-summary { font-size: 11.5px; color: #7c3aed; margin-top: 3px; }
+        .item-info .stock-summary { font-size: 11.5px; font-weight: 700; margin-top: 3px; }
+        .item-info .stock-summary.ok { color: #1d7d72; }
+        .item-info .stock-summary.low { color: #e74c3c; }
         .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .add-form {
@@ -350,6 +355,7 @@
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
+        #itemStock { width: 110px; }
         #itemCategoryNew { width: 160px; }
         #newTableId, #newTableLabel { width: 160px; }
 
@@ -441,6 +447,7 @@
             border: 1.5px solid #eee; border-radius: 10px; font-size: 14px;
         }
         .edit-modal label { font-size: 12px; color: #777; font-weight: 700; display:block; margin-bottom:4px; }
+        .stock-hint { font-size: 11.5px; color: #999; margin: -6px 0 10px; }
 
         .period-toggle {
             display: flex;
@@ -647,6 +654,7 @@
                 <input type="text" id="itemId" placeholder="id (e.g. fries)">
                 <input type="text" id="itemName" placeholder="Name">
                 <input type="number" id="itemPrice" placeholder="Price" step="0.01">
+                <input type="number" id="itemStock" placeholder="Stock (optional)" step="1" min="0">
                 <textarea id="itemDesc" placeholder="Description" rows="1" oninput="autoGrow(this)"></textarea>
                 <select id="itemCategory" onchange="handleCategorySelectChange('item')"></select>
                 <input type="text" id="itemCategoryNew" placeholder="New category name" style="display:none;">
@@ -681,6 +689,9 @@
             <input type="text" id="editName">
             <label id="editPriceLabel">Price</label>
             <input type="number" id="editPrice" step="0.01">
+            <label id="editStockLabel">Stock</label>
+            <input type="number" id="editStock" step="1" min="0" placeholder="Leave empty for unlimited">
+            <p class="stock-hint" id="stockHint">Leave empty for unlimited stock.</p>
             <label id="editDescLabel">Description</label>
             <textarea id="editDesc" oninput="autoGrow(this)"></textarea>
             <label id="editCategoryLabel">Category</label>
@@ -790,11 +801,15 @@
                 no_tables: "Δεν υπάρχουν τραπέζια ακόμα.",
                 called_for_waiter: "🔔 Κάλεσε σερβιτόρο",
                 wants_to_pay: (m) => `💳 Θέλει να πληρώσει${m ? " — " + m : ""}`,
+                out_of_stock_alert: (n) => `📦 Τελείωσε το απόθεμα (${n})`,
                 cash: "💵 Μετρητά",
                 card: "💳 Κάρτα",
                 id_placeholder: "id (π.χ. fries)",
                 name_field_placeholder: "Όνομα",
                 price_placeholder: "Τιμή",
+                stock_placeholder: "Απόθεμα (προαιρετικό)",
+                stock_hint: "Αφήστε κενό για απεριόριστο απόθεμα.",
+                stock_label: "Απόθεμα",
                 desc_placeholder: "Περιγραφή",
                 new_category_placeholder: "Όνομα νέας κατηγορίας",
                 image_url_btn: "Σύνδεσμος Εικόνας",
@@ -836,6 +851,8 @@
                 delete_table_confirm: (id) => `Οριστική διαγραφή τραπεζιού "${id}"; Αυτό δεν μπορεί να αναιρεθεί.`,
                 cannot_delete_occupied: "Δεν είναι δυνατή η διαγραφή τραπεζιού με ενεργή συνεδρία — απελευθερώστε το πρώτα.",
                 extras_summary: (list) => `+ ${list}`,
+                stock_summary: (n) => `📦 Απόθεμα: ${n}`,
+                out_of_stock_label: "📦 Εξαντλήθηκε",
                 analytics: "Αναλυτικά Στοιχεία",
                 revenue_trend: "Τάση Εσόδων",
                 top_items: "Δημοφιλέστερα Προϊόντα (Όλες οι Κατηγορίες)",
@@ -923,11 +940,15 @@
                 no_tables: "No tables yet.",
                 called_for_waiter: "🔔 Called for a waiter",
                 wants_to_pay: (m) => `💳 Wants to pay${m ? " — " + m : ""}`,
+                out_of_stock_alert: (n) => `📦 Out of stock (${n})`,
                 cash: "💵 Cash",
                 card: "💳 Card",
                 id_placeholder: "id (e.g. fries)",
                 name_field_placeholder: "Name",
                 price_placeholder: "Price",
+                stock_placeholder: "Stock (optional)",
+                stock_hint: "Leave empty for unlimited stock.",
+                stock_label: "Stock",
                 desc_placeholder: "Description",
                 new_category_placeholder: "New category name",
                 image_url_btn: "Image URL",
@@ -969,6 +990,8 @@
                 delete_table_confirm: (id) => `Permanently delete table "${id}"? This cannot be undone.`,
                 cannot_delete_occupied: "Cannot delete a table with an active session — release it first.",
                 extras_summary: (list) => `+ ${list}`,
+                stock_summary: (n) => `📦 Stock: ${n}`,
+                out_of_stock_label: "📦 Out of stock",
                 analytics: "Analytics",
                 revenue_trend: "Revenue Trend",
                 top_items: "Top-Selling Items (All Categories)",
@@ -1061,6 +1084,7 @@
             document.getElementById("itemId").placeholder = t("id_placeholder");
             document.getElementById("itemName").placeholder = t("name_field_placeholder");
             document.getElementById("itemPrice").placeholder = t("price_placeholder");
+            document.getElementById("itemStock").placeholder = t("stock_placeholder");
             document.getElementById("itemDesc").placeholder = t("desc_placeholder");
             document.getElementById("itemCategoryNew").placeholder = t("new_category_placeholder");
             document.getElementById("addSourceUrl").innerText = t("image_url_btn");
@@ -1072,6 +1096,8 @@
             document.getElementById("editTitle").innerText = t("edit_item_title");
             document.getElementById("editNameLabel").innerText = t("name_label");
             document.getElementById("editPriceLabel").innerText = t("price_label");
+            document.getElementById("editStockLabel").innerText = t("stock_label");
+            document.getElementById("stockHint").innerText = t("stock_hint");
             document.getElementById("editDescLabel").innerText = t("desc_label");
             document.getElementById("editCategoryLabel").innerText = t("category_label");
             document.getElementById("editImageLabel").innerText = t("image_label");
@@ -1389,7 +1415,8 @@
             Promise.all([
                 fetch(`${BASE}/tables`).then(r => r.json()),
                 fetch(`${BASE}/sessions`).then(r => r.json()),
-            ]).then(([tables, sessions]) => {
+                fetch(`${BASE}/menu-items`).then(r => r.json()),
+            ]).then(([tables, sessions, menuItems]) => {
                 const sessionByTableId = {};
                 sessions.forEach(s => { sessionByTableId[s.table_id] = s; });
 
@@ -1414,6 +1441,15 @@
                             </div>
                         `;
                     }
+                });
+
+                const outOfStockItems = (menuItems || []).filter(i => i.stock !== null && i.stock !== undefined && i.stock <= 0);
+                outOfStockItems.forEach(item => {
+                    alertsHtml += `
+                        <div class="alert-row stock">
+                            <div><div class="table-name">${escapeHtml(item.name)}</div><div class="type">${t("out_of_stock_alert", item.stock)}</div></div>
+                        </div>
+                    `;
                 });
 
                 document.getElementById("alertsList").innerHTML = alertsHtml || `<div class="alert-empty">${t("no_alerts")}</div>`;
@@ -1897,14 +1933,20 @@
                         html += `<div class="category-heading">${categoryLabel(cat)}</div>`;
                         html += byCategory[cat].map(item => {
                             const extrasList = (item.extras || []).map(e => `${escapeHtml(e.name)} (+€${Number(e.price).toFixed(2)})`).join(", ");
+                            const hasStock = item.stock !== null && item.stock !== undefined;
+                            const isOut = hasStock && item.stock <= 0;
+                            const stockHtml = hasStock
+                                ? `<div class="stock-summary ${isOut ? 'low' : 'ok'}">${isOut ? t("out_of_stock_label") : t("stock_summary", item.stock)}</div>`
+                                : "";
                             return `
-                            <div class="menu-item-row ${item.available ? '' : 'unavailable'}">
+                            <div class="menu-item-row ${item.available ? '' : 'unavailable'} ${isOut ? 'out-of-stock' : ''}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
                                 <div class="item-info">
                                     <div class="name">${escapeHtml(item.name)} ${item.available ? '' : t("unavailable_suffix")}</div>
                                     <div class="price">€${Number(item.price).toFixed(2)}</div>
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
                                     ${extrasList ? `<div class="extras-summary">${t("extras_summary", extrasList)}</div>` : ""}
+                                    ${stockHtml}
                                 </div>
                                 <div class="item-actions">
                                     <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? t("hide") : t("show")}</button>
@@ -1924,6 +1966,8 @@
             const id = document.getElementById("itemId").value.trim();
             const name = document.getElementById("itemName").value.trim();
             const price = parseFloat(document.getElementById("itemPrice").value);
+            const stockVal = document.getElementById("itemStock").value;
+            const stock = stockVal === "" ? null : parseInt(stockVal, 10);
             const desc = document.getElementById("itemDesc").value;
             const category = getSelectedCategory("item");
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
@@ -1942,7 +1986,7 @@
 
             authFetchJson(`${BASE}/menu-items`, {
                 method: "POST",
-                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras })
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras, stock })
             })
                 .then(r => r ? r.json() : null)
                 .then(data => {
@@ -1956,6 +2000,7 @@
                     document.getElementById("itemId").value = "";
                     document.getElementById("itemName").value = "";
                     document.getElementById("itemPrice").value = "";
+                    document.getElementById("itemStock").value = "";
                     document.getElementById("itemDesc").value = "";
                     document.getElementById("itemDesc").style.height = "auto";
                     document.getElementById("itemCategoryNew").value = "";
@@ -1996,6 +2041,7 @@
             editImageData = "";
             document.getElementById("editName").value = item.name;
             document.getElementById("editPrice").value = item.price;
+            document.getElementById("editStock").value = (item.stock === null || item.stock === undefined) ? "" : item.stock;
             document.getElementById("editDesc").value = item.description || "";
             autoGrow(document.getElementById("editDesc"));
             document.getElementById("editCategory").value = item.category || "other";
@@ -2022,6 +2068,7 @@
         function saveEdit() {
             const name = document.getElementById("editName").value;
             const price = parseFloat(document.getElementById("editPrice").value);
+            const stockVal = document.getElementById("editStock").value;
             const desc = document.getElementById("editDesc").value;
             const category = getSelectedCategory("edit");
             const urlVisible = document.getElementById("editImageUrl").style.display !== "none";
@@ -2030,6 +2077,12 @@
 
             const payload = { name, price, description: desc, category, extras };
             if (image) payload.image = image;
+
+            if (stockVal === "") {
+                payload.clear_stock = true;
+            } else {
+                payload.stock = parseInt(stockVal, 10);
+            }
 
             const btn = document.getElementById("saveEditBtn");
             const originalText = t("save");
