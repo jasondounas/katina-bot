@@ -146,6 +146,25 @@
 
         .container { padding: 24px; max-width: 900px; margin: 0 auto; }
 
+        .mini-stat-bar {
+            position: sticky;
+            top: 10px;
+            z-index: 15;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: white;
+            border-radius: 20px;
+            padding: 7px 16px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+            font-size: 13px;
+            font-weight: 700;
+            color: #ff6b35;
+            margin-bottom: 20px;
+        }
+        .mini-stat-bar .mini-icon { font-size: 14px; }
+        .mini-stat-bar .mini-label { color: #999; font-weight: 600; font-size: 11.5px; }
+
         .stats-row {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -164,6 +183,10 @@
         .stat-card.money .num, .stat-card.money .label { color: white; }
         .stat-card.money-outstanding { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
         .stat-card.money-outstanding .num, .stat-card.money-outstanding .label { color: white; }
+        .stat-card.occupied-card { background: linear-gradient(135deg, #4a90e2, #1d5fd7); }
+        .stat-card.occupied-card .num, .stat-card.occupied-card .label { color: white; }
+        .stat-card.unpaid-card { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .stat-card.unpaid-card .num, .stat-card.unpaid-card .label { color: white; }
 
         .section-title {
             display: flex; align-items: center; justify-content: space-between;
@@ -423,6 +446,7 @@
             display: flex;
             gap: 8px;
             margin-bottom: 14px;
+            flex-wrap: wrap;
         }
         .period-toggle button {
             background: #f0f0f0;
@@ -538,6 +562,12 @@
 
     <div class="container">
 
+        <div class="mini-stat-bar" id="miniStatBar">
+            <span class="mini-icon">📈</span>
+            <span id="miniStatValue">€0.00</span>
+            <span class="mini-label" id="miniStatLabel">Today</span>
+        </div>
+
         <div class="stats-row" id="statsRow">
             <div class="loading-block"><div class="spinner"></div></div>
         </div>
@@ -561,6 +591,7 @@
             <button id="periodDailyBtn" class="active" onclick="setPeriod('daily')">Daily</button>
             <button id="periodWeeklyBtn" onclick="setPeriod('weekly')">Weekly</button>
             <button id="periodMonthlyBtn" onclick="setPeriod('monthly')">Monthly</button>
+            <button id="periodTotalBtn" onclick="setPeriod('total')">Total</button>
         </div>
 
         <div class="waiter-filter-row">
@@ -745,9 +776,10 @@
                 currently_unpaid: "Απλήρωτο Τώρα",
                 total_tables: "Σύνολο Τραπεζιών",
                 occupied: "Κατειλημμένα",
-                open_sessions: "Ανοιχτές Συνεδρίες",
+                unpaid_tables: "Απλήρωτα Τραπέζια",
                 pending_orders: "Εκκρεμείς Παραγγελίες",
                 live_alerts: "Ζωντανές Ειδοποιήσεις",
+                today_label: "Σήμερα",
                 tables: "Τραπέζια",
                 tables_hint: "Πατήστε σε κατειλημμένο τραπέζι για να δείτε και να διαχειριστείτε τις παραγγελίες του.",
                 recent_activity: "Πρόσφατη Δραστηριότητα",
@@ -811,6 +843,7 @@
                 period_daily: "Ημερήσια",
                 period_weekly: "Εβδομαδιαία",
                 period_monthly: "Μηνιαία",
+                period_total: "Σύνολο",
                 window_revenue: "Έσοδα Περιόδου",
                 window_items_sold: "Προϊόντα που Πουλήθηκαν",
                 no_chart_data: "Δεν υπάρχουν ακόμα δεδομένα για αυτή την περίοδο.",
@@ -826,6 +859,7 @@
                 voided_label: "🚫 Διαγράφηκε",
                 void_reason_prompt: "Λόγος διαγραφής παραγγελίας:",
                 void_reason_required: "Απαιτείται λόγος.",
+                paid_tag: "Πληρωμένο",
                 status_labels: { PENDING_REVIEW: "Εκκρεμεί", APPROVED: "Εγκρίθηκε", REJECTED: "Απορρίφθηκε", CANCELLED: "Ακυρώθηκε", VOIDED: "Διαγράφηκε" },
                 by: (n) => `από ${n}`,
                 settings: "Ρυθμίσεις",
@@ -875,9 +909,10 @@
                 currently_unpaid: "Currently Unpaid",
                 total_tables: "Total Tables",
                 occupied: "Occupied",
-                open_sessions: "Open Sessions",
+                unpaid_tables: "Unpaid Tables",
                 pending_orders: "Pending Orders",
                 live_alerts: "Live Alerts",
+                today_label: "Today",
                 tables: "Tables",
                 tables_hint: "Tap an occupied table to view and manage its orders.",
                 recent_activity: "Recent Activity",
@@ -941,6 +976,7 @@
                 period_daily: "Daily",
                 period_weekly: "Weekly",
                 period_monthly: "Monthly",
+                period_total: "Total",
                 window_revenue: "Period Revenue",
                 window_items_sold: "Items Sold",
                 no_chart_data: "No data yet for this period.",
@@ -956,6 +992,7 @@
                 voided_label: "🚫 Voided",
                 void_reason_prompt: "Reason for voiding this order:",
                 void_reason_required: "A reason is required.",
+                paid_tag: "Paid",
                 status_labels: { PENDING_REVIEW: "PENDING REVIEW", APPROVED: "APPROVED", REJECTED: "REJECTED", CANCELLED: "CANCELLED", VOIDED: "VOIDED" },
                 by: (n) => `by ${n}`,
                 settings: "Settings",
@@ -983,6 +1020,7 @@
                 loadMenuItems();
                 loadTablesManagement();
                 loadAnalytics(currentPeriod);
+                loadDailyMiniStat();
                 if (activityLoaded) loadActivity();
                 if (currentOrdersTableId) openTableOrders(currentOrdersTableId);
                 updateModeButtons();
@@ -1000,6 +1038,7 @@
             document.getElementById("unlockBtn").innerText = t("unlock");
             document.getElementById("headerTitle").innerText = t("dashboard_title");
             document.getElementById("liveAlertsTitle").innerText = t("live_alerts");
+            document.getElementById("miniStatLabel").innerText = t("today_label");
             document.getElementById("settingsTitle").innerText = t("settings");
             document.getElementById("tableStatusModeLabel").innerText = t("table_status_mode_label");
             document.getElementById("modeSimpleBtn").innerText = t("mode_simple");
@@ -1013,6 +1052,7 @@
             document.getElementById("periodDailyBtn").innerText = t("period_daily");
             document.getElementById("periodWeeklyBtn").innerText = t("period_weekly");
             document.getElementById("periodMonthlyBtn").innerText = t("period_monthly");
+            document.getElementById("periodTotalBtn").innerText = t("period_total");
             document.getElementById("waiterFilterLabel").innerText = t("waiter_filter_label");
             document.getElementById("allWaitersOption").innerText = t("all_waiters");
             document.getElementById("newTableId").placeholder = t("table_id_placeholder");
@@ -1266,6 +1306,15 @@
                 });
         }
 
+        function loadDailyMiniStat() {
+            authFetch(`${BASE}/analytics?period=daily`)
+                .then(r => r ? r.json() : null)
+                .then(data => {
+                    if (!data) return;
+                    document.getElementById("miniStatValue").innerText = `€${data.window_summary.total_revenue.toFixed(2)}`;
+                });
+        }
+
         function init() {
             loadStats();
             loadAlerts();
@@ -1273,9 +1322,11 @@
             loadMenuItems();
             loadAnalytics(currentPeriod);
             loadSettings();
+            loadDailyMiniStat();
             setInterval(() => {
                 loadStats();
                 loadAlerts();
+                loadDailyMiniStat();
                 if (currentOrdersTableId) openTableOrders(currentOrdersTableId, true);
             }, 8000);
         }
@@ -1301,15 +1352,32 @@
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
                 fetch(`${BASE}/sessions`).then(r => r.json()),
                 authFetch(`${BASE}/revenue-stats`).then(r => r ? r.json() : null),
-            ]).then(([tables, pending, sessions, revenue]) => {
+                fetch(`${BASE}/settings`).then(r => r.json()).catch(() => ({})),
+            ]).then(([tables, pending, sessions, revenue, settings]) => {
                 if (!revenue) return;
-                const occupied = tables.filter(t => t.active_session_id).length;
+
+                currentTableStatusMode = (settings && settings.table_status_mode) || "simple";
+
+                let extraCardsHtml;
+                if (currentTableStatusMode === "detailed") {
+                    const occupiedCount = sessions.filter(s => (s.unpaid_balance || 0) === 0).length;
+                    const unpaidCount = sessions.filter(s => (s.unpaid_balance || 0) > 0).length;
+                    extraCardsHtml = `
+                        <div class="stat-card occupied-card"><div class="num">${occupiedCount}</div><div class="label">${t("occupied")}</div></div>
+                        <div class="stat-card unpaid-card"><div class="num">${unpaidCount}</div><div class="label">${t("unpaid_tables")}</div></div>
+                    `;
+                } else {
+                    const occupied = tables.filter(t => t.active_session_id).length;
+                    extraCardsHtml = `
+                        <div class="stat-card occupied-card"><div class="num">${occupied}</div><div class="label">${t("occupied")}</div></div>
+                    `;
+                }
+
                 document.getElementById("statsRow").innerHTML = `
                     <div class="stat-card money"><div class="num">€${revenue.total_revenue.toFixed(2)}</div><div class="label">${t("total_revenue")}</div></div>
                     <div class="stat-card money-outstanding"><div class="num">€${revenue.unpaid_amount.toFixed(2)}</div><div class="label">${t("currently_unpaid")}</div></div>
                     <div class="stat-card"><div class="num">${tables.length}</div><div class="label">${t("total_tables")}</div></div>
-                    <div class="stat-card"><div class="num">${occupied}</div><div class="label">${t("occupied")}</div></div>
-                    <div class="stat-card"><div class="num">${sessions.length}</div><div class="label">${t("open_sessions")}</div></div>
+                    ${extraCardsHtml}
                     <div class="stat-card"><div class="num">${pending.length}</div><div class="label">${t("pending_orders")}</div></div>
                 `;
             });
@@ -1355,6 +1423,7 @@
             document.getElementById("periodDailyBtn").classList.toggle("active", period === "daily");
             document.getElementById("periodWeeklyBtn").classList.toggle("active", period === "weekly");
             document.getElementById("periodMonthlyBtn").classList.toggle("active", period === "monthly");
+            document.getElementById("periodTotalBtn").classList.toggle("active", period === "total");
             loadAnalytics(period);
         }
 
@@ -1365,7 +1434,7 @@
 
         function formatBucketLabel(isoStr, period) {
             const d = new Date(isoStr);
-            if (period === "monthly") {
+            if (period === "monthly" || period === "total") {
                 return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", year: "numeric" });
             }
             return d.toLocaleDateString(currentLang === "gr" ? "el-GR" : "en-US", { month: "short", day: "numeric" });
@@ -1746,7 +1815,7 @@
                                             if (o.status === "APPROVED" && !o.paid && session.status === "OPEN") {
                                                 actionsHtml = `<button class="danger" onclick="voidOrderFromDashboard('${o.order_id}')">${t("void")}</button>`;
                                             } else if (o.status === "APPROVED" && o.paid) {
-                                                actionsHtml = `<span style="font-size:12px;color:#1d7d72;font-weight:700;">${t("paid_tag") || "Paid"}</span>`;
+                                                actionsHtml = `<span style="font-size:12px;color:#1d7d72;font-weight:700;">${t("paid_tag")}</span>`;
                                             } else {
                                                 actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
                                             }
