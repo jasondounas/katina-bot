@@ -362,7 +362,7 @@ def get_revenue_stats(_auth: None = Depends(verify_waiter)):
 
 @app.get("/analytics")
 def get_analytics(period: str = "daily", waiter: str = None, _auth: None = Depends(verify_waiter)):
-    if period not in ("daily", "weekly", "monthly"):
+    if period not in ("daily", "weekly", "monthly", "total"):
         period = "daily"
 
     now = datetime.utcnow()
@@ -374,9 +374,13 @@ def get_analytics(period: str = "daily", waiter: str = None, _auth: None = Depen
         window_start = now - timedelta(days=7)
         trend_start = now - timedelta(weeks=8)
         trend_group = "week"
-    else:
+    elif period == "monthly":
         window_start = now - timedelta(days=30)
         trend_start = now - timedelta(days=180)
+        trend_group = "month"
+    else:
+        window_start = datetime(2000, 1, 1)
+        trend_start = datetime(2000, 1, 1)
         trend_group = "month"
 
     conn = get_connection()
@@ -761,11 +765,26 @@ def get_session(session_id: str):
 def list_sessions(status: str = "OPEN"):
     conn = get_connection()
     cur = get_cursor(conn)
-    cur.execute("SELECT * FROM sessions WHERE status = %s", (status,))
+    cur.execute("""
+        SELECT s.*,
+               COALESCE((
+                   SELECT SUM(o.price * o.qty)
+                   FROM orders o
+                   WHERE o.session_id = s.session_id AND o.status = 'APPROVED' AND o.paid = 0
+               ), 0) as unpaid_balance
+        FROM sessions s
+        WHERE s.status = %s
+    """, (status,))
     sessions = cur.fetchall()
     cur.close()
     conn.close()
-    return [dict(s) for s in sessions]
+
+    result = []
+    for s in sessions:
+        d = dict(s)
+        d["unpaid_balance"] = float(d["unpaid_balance"])
+        result.append(d)
+    return result
 
 
 @app.post("/sessions/open")
