@@ -4,7 +4,15 @@
     <title>Katina — Kitchen</title>
     <style>
         body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
-        h1 { text-align: center; font-size: 36px; margin-bottom: 30px; }
+        h1 { text-align: center; font-size: 36px; margin-bottom: 6px; }
+        .station-subtitle {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ff9d70;
+            margin-bottom: 24px;
+        }
+        .station-subtitle a { color: #4a90e2; text-decoration: none; margin-left: 8px; }
 
         .stock-panel {
             background: #2c2c2c;
@@ -126,10 +134,35 @@
             cursor: default;
         }
         .empty-msg { color: #888; font-size: 20px; text-align: center; padding: 40px 0; }
+
+        #printArea { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea {
+                display: block;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 72mm;
+                background: white;
+                color: black;
+                font-family: 'Courier New', monospace;
+                padding: 4mm;
+            }
+            .print-slip { page-break-after: always; }
+            .print-slip .p-table { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+            .print-slip .p-item { font-size: 20px; font-weight: 800; margin: 6px 0; }
+            .print-slip .p-extras { font-size: 14px; margin: 4px 0; }
+            .print-slip .p-note { font-size: 14px; font-style: italic; margin: 4px 0; }
+            .print-slip .p-divider { border-top: 1px dashed #000; margin: 8px 0; }
+        }
     </style>
 </head>
 <body>
     <h1>🔥 Kitchen Display</h1>
+    <div class="station-subtitle" id="stationSubtitle" style="display:none;"></div>
 
     <div class="stock-panel" id="stockPanel" style="display:none;">
         <div class="stock-panel-title">📦 Stock Status — tap an item if it runs out</div>
@@ -138,10 +171,14 @@
 
     <div id="categorySections"></div>
 
+    <div id="printArea"></div>
+
     <script>
        const PDA = "https://katina-bot-1.onrender.com";
        const BASE = "https://katina-bot.onrender.com";
        let previousTicketCount = 0;
+       let seenOrderIds = new Set();
+       let firstLoad = true;
 
        const CATEGORY_LABELS = {
            drinks: "🥤 Drinks",
@@ -151,8 +188,25 @@
        };
        const CATEGORY_ORDER = ["drinks", "salads", "burgers"];
 
+       const urlParams = new URLSearchParams(window.location.search);
+       const stationParam = urlParams.get("station");
+       const stationFilter = stationParam
+           ? stationParam.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
+           : null;
+
        function categoryLabel(cat) {
            return CATEGORY_LABELS[cat] || ("🍽️ " + cat.charAt(0).toUpperCase() + cat.slice(1));
+       }
+
+       if (stationFilter) {
+           const subtitle = document.getElementById("stationSubtitle");
+           subtitle.style.display = "block";
+           subtitle.innerHTML = `Station: ${stationParam} <a href="kitchen.html">(view all)</a>`;
+       }
+
+       function matchesStation(itemStation) {
+           if (!stationFilter) return true;
+           return stationFilter.includes((itemStation || "").trim().toLowerCase());
        }
 
        function playNotificationSound() {
@@ -194,14 +248,48 @@
            `;
        }
 
+       function buildPrintSlipHtml(t) {
+           const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+           return `
+               <div class="print-slip">
+                   <div class="p-table">${escapeHtml(t.table_label || 'Table')} — ${now}</div>
+                   <div class="p-divider"></div>
+                   <div class="p-item">${t.qty}x ${escapeHtml(t.item)}</div>
+                   ${t.extras ? `<div class="p-extras">+ ${escapeHtml(t.extras)}</div>` : ""}
+                   ${t.note ? `<div class="p-note">Note: ${escapeHtml(t.note)}</div>` : ""}
+                   <div class="p-divider"></div>
+               </div>
+           `;
+       }
+
+       function printNewTickets(newTickets) {
+           if (!newTickets.length) return;
+           const printArea = document.getElementById("printArea");
+           printArea.innerHTML = newTickets.map(buildPrintSlipHtml).join("");
+           window.print();
+       }
+
        function loadTickets() {
            fetch(`${PDA}/kitchen-tickets`)
                .then(r => r.json())
                .then(tickets => {
+                   if (stationFilter) {
+                       tickets = tickets.filter(t => matchesStation(t.station));
+                   }
+
                    if (tickets.length > previousTicketCount) {
                        playNotificationSound();
                    }
                    previousTicketCount = tickets.length;
+
+                   if (!firstLoad) {
+                       const newTickets = tickets.filter(t => !seenOrderIds.has(t.order_id));
+                       if (newTickets.length > 0) {
+                           printNewTickets(newTickets);
+                       }
+                   }
+                   tickets.forEach(t => seenOrderIds.add(t.order_id));
+                   firstLoad = false;
 
                    const container = document.getElementById("categorySections");
 
@@ -239,6 +327,7 @@
         function markDone(orderId, btn) {
             btn.disabled = true;
             btn.innerText = "...";
+            seenOrderIds.delete(orderId);
             fetch(`${PDA}/kitchen-tickets/${orderId}/done`, { method: "POST" })
                 .then(() => fetch(`${BASE}/orders/${orderId}/ready`, { method: "POST" }))
                 .then(() => loadTickets())
@@ -249,7 +338,11 @@
             fetch(`${BASE}/menu-items`)
                 .then(r => r.json())
                 .then(items => {
-                    const assigned = (items || []).filter(i => i.kitchen_assigned);
+                    let assigned = (items || []).filter(i => i.kitchen_assigned);
+                    if (stationFilter) {
+                        assigned = assigned.filter(i => matchesStation(i.kitchen_station));
+                    }
+
                     const panel = document.getElementById("stockPanel");
                     const list = document.getElementById("stockItems");
 
