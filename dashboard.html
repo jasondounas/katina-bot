@@ -667,6 +667,10 @@
         </div>
         <div class="collapsible-body" id="activityList"></div>
 
+        <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="kitchenLinksTitle">Kitchen Station Links</span></span></div>
+        <p style="color:#999; font-size:13px; margin:-12px 0 16px;" id="kitchenLinksHint">Give each station tablet the link matching its station.</p>
+        <div id="kitchenLinksList" style="margin-bottom:32px;"></div>
+
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="menuItemsTitle">Menu Items</span></span></div>
 
         <div class="add-form">
@@ -688,6 +692,11 @@
             <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleAddImageFile(this)">
             <img class="image-preview" id="addImagePreview">
 
+            <div style="margin-top:12px;">
+                <label id="itemKitchenStationLabel" style="font-size:12px; color:#777; font-weight:700; display:block; margin-bottom:4px;">Kitchen station (optional)</label>
+                <input type="text" id="itemKitchenStation" list="stationSuggestions" placeholder="e.g. Salads, Grill, Bar" style="width:220px;">
+            </div>
+
             <div class="kitchen-checkbox-row">
                 <input type="checkbox" id="itemKitchenAssigned">
                 <label for="itemKitchenAssigned" id="itemKitchenAssignedLabel" style="cursor:pointer;">Let kitchen report this out of stock</label>
@@ -705,6 +714,7 @@
         </div>
 
         <div id="menuItemsList"><div class="loading-block"><div class="spinner"></div></div></div>
+        <datalist id="stationSuggestions"></datalist>
     </div>
 
     <div class="modal-overlay" id="editOverlay">
@@ -731,6 +741,9 @@
             <input type="text" id="editImageUrl" placeholder="Image URL">
             <input type="file" id="editImageFile" accept="image/*" style="display:none;" onchange="handleEditImageFile(this)">
             <img class="image-preview" id="editImagePreview">
+
+            <label id="editKitchenStationLabel" style="margin-top:10px;">Kitchen station (optional)</label>
+            <input type="text" id="editKitchenStation" list="stationSuggestions" placeholder="e.g. Salads, Grill, Bar">
 
             <div class="kitchen-checkbox-row">
                 <input type="checkbox" id="editKitchenAssigned">
@@ -887,6 +900,13 @@
                 kitchen_out_alert: (n) => `👨‍🍳 Η κουζίνα δήλωσε ότι τελείωσε: ${n}`,
                 kitchen_out_badge: "👨‍🍳 Τελείωσε (κουζίνα)",
                 kitchen_assigned_badge: "👨‍🍳 Κουζίνα",
+                kitchen_links_title: "Σύνδεσμοι Σταθμών Κουζίνας",
+                kitchen_links_hint: "Δώστε σε κάθε ταμπλέτα τον σύνδεσμο του σταθμού της.",
+                kitchen_station_label: "Σταθμός κουζίνας (προαιρετικό)",
+                no_stations_msg: "Δεν έχετε ορίσει σταθμούς κουζίνας ακόμα — προσθέστε έναν σε κάποιο προϊόν.",
+                all_stations_label: "🍽️ Όλοι οι Σταθμοί",
+                copy_label: "Αντιγραφή",
+                copied_label: "Αντιγράφηκε!",
                 analytics: "Αναλυτικά Στοιχεία",
                 revenue_trend: "Τάση Εσόδων",
                 top_items: "Δημοφιλέστερα Προϊόντα (Όλες οι Κατηγορίες)",
@@ -1032,6 +1052,13 @@
                 kitchen_out_alert: (n) => `👨‍🍳 Kitchen reported out: ${n}`,
                 kitchen_out_badge: "👨‍🍳 Out (kitchen)",
                 kitchen_assigned_badge: "👨‍🍳 Kitchen",
+                kitchen_links_title: "Kitchen Station Links",
+                kitchen_links_hint: "Give each station tablet the link matching its station.",
+                kitchen_station_label: "Kitchen station (optional)",
+                no_stations_msg: "No kitchen stations set yet — add one on any menu item.",
+                all_stations_label: "🍽️ All Stations",
+                copy_label: "Copy",
+                copied_label: "Copied!",
                 analytics: "Analytics",
                 revenue_trend: "Revenue Trend",
                 top_items: "Top-Selling Items (All Categories)",
@@ -1109,6 +1136,8 @@
             document.getElementById("tablesTitle").innerText = t("tables");
             document.getElementById("tablesHint").innerText = t("tables_hint");
             document.getElementById("recentActivityTitle").innerText = t("recent_activity");
+            document.getElementById("kitchenLinksTitle").innerText = t("kitchen_links_title");
+            document.getElementById("kitchenLinksHint").innerText = t("kitchen_links_hint");
             document.getElementById("menuItemsTitle").innerText = t("menu_items");
             document.getElementById("analyticsTitle").innerText = t("analytics");
             document.getElementById("waiterPerfTitle").innerText = t("waiter_perf");
@@ -1140,6 +1169,8 @@
             document.getElementById("stockHint").innerText = t("stock_hint");
             document.getElementById("itemKitchenAssignedLabel").innerText = t("kitchen_assigned_checkbox");
             document.getElementById("editKitchenAssignedLabel").innerText = t("kitchen_assigned_checkbox");
+            document.getElementById("itemKitchenStationLabel").innerText = t("kitchen_station_label");
+            document.getElementById("editKitchenStationLabel").innerText = t("kitchen_station_label");
             document.getElementById("editDescLabel").innerText = t("desc_label");
             document.getElementById("editCategoryLabel").innerText = t("category_label");
             document.getElementById("editImageLabel").innerText = t("image_label");
@@ -1163,6 +1194,67 @@
 
         function translateAction(action) {
             return T[currentLang].action_labels[action] || action;
+        }
+
+        function getKnownStations() {
+            const items = window._menuItemsCache || [];
+            const stations = items
+                .map(i => (i.kitchen_station || "").trim())
+                .filter(Boolean);
+            return [...new Set(stations)];
+        }
+
+        function populateStationSuggestions() {
+            const datalist = document.getElementById("stationSuggestions");
+            if (!datalist) return;
+            const stations = getKnownStations();
+            datalist.innerHTML = stations.map(s => `<option value="${escapeHtml(s)}">`).join("");
+        }
+
+        function renderKitchenStationLinks() {
+            const kitchenBase = "https://katina-bot-2.onrender.com/kitchen.html";
+            const stations = getKnownStations();
+            const list = document.getElementById("kitchenLinksList");
+            if (!list) return;
+
+            let html = `
+                <div class="table-row">
+                    <div class="info"><div class="name">${t("all_stations_label")}</div></div>
+                    <div class="actions">
+                        <input type="text" readonly value="${kitchenBase}" style="width:200px; font-size:12px; padding:8px;" onclick="this.select()">
+                        <button class="secondary" onclick="copyStationLink('${kitchenBase}', this)">${t("copy_label")}</button>
+                    </div>
+                </div>
+            `;
+
+            if (!stations.length) {
+                html += `<p style="color:#999; font-size:13px; margin-top:10px;">${t("no_stations_msg")}</p>`;
+                list.innerHTML = html;
+                return;
+            }
+
+            stations.forEach(station => {
+                const url = `${kitchenBase}?station=${encodeURIComponent(station)}`;
+                html += `
+                    <div class="table-row">
+                        <div class="info"><div class="name">👨‍🍳 ${escapeHtml(station)}</div></div>
+                        <div class="actions">
+                            <input type="text" readonly value="${url}" style="width:220px; font-size:12px; padding:8px;" onclick="this.select()">
+                            <button class="secondary" onclick="copyStationLink('${url}', this)">${t("copy_label")}</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        function copyStationLink(url, btn) {
+            navigator.clipboard.writeText(url).then(() => {
+                const original = btn.innerText;
+                btn.innerText = t("copied_label");
+                setTimeout(() => { btn.innerText = original; }, 1500);
+            });
         }
 
         function getToken() { return localStorage.getItem("waiterToken"); }
@@ -1966,6 +2058,8 @@
                     const list = document.getElementById("menuItemsList");
                     window._menuItemsCache = items;
                     populateCategoryDropdowns();
+                    populateStationSuggestions();
+                    renderKitchenStationLinks();
 
                     if (!items.length) {
                         list.innerHTML = `<p style="color:#999;">${t("no_items")}</p>`;
@@ -1992,6 +2086,9 @@
                             const kitchenBadge = item.kitchen_assigned
                                 ? `<span class="kitchen-badge ${item.kitchen_out ? 'out' : 'assigned'}">${item.kitchen_out ? t("kitchen_out_badge") : t("kitchen_assigned_badge")}</span>`
                                 : "";
+                            const stationBadge = item.kitchen_station
+                                ? `<span class="kitchen-badge assigned">👨‍🍳 ${escapeHtml(item.kitchen_station)}</span>`
+                                : "";
                             return `
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'} ${isOut ? 'out-of-stock' : ''}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
@@ -2001,6 +2098,7 @@
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
                                     ${extrasList ? `<div class="extras-summary">${t("extras_summary", extrasList)}</div>` : ""}
                                     ${stockHtml}
+                                    ${stationBadge}
                                     ${kitchenBadge}
                                 </div>
                                 <div class="item-actions">
@@ -2029,6 +2127,7 @@
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
             const extras = collectExtras("itemExtrasList");
             const kitchenAssigned = document.getElementById("itemKitchenAssigned").checked ? 1 : 0;
+            const kitchenStation = document.getElementById("itemKitchenStation").value.trim() || null;
 
             if (!id || !name || !price) {
                 document.getElementById("addResult").innerText = t("required_fields");
@@ -2042,7 +2141,7 @@
 
             authFetchJson(`${BASE}/menu-items`, {
                 method: "POST",
-                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras, stock })
+                body: JSON.stringify({ item_id: id, name, price, description: desc, image, category, extras, stock, kitchen_station: kitchenStation })
             })
                 .then(r => r ? r.json() : null)
                 .then(data => {
@@ -2066,6 +2165,7 @@
                     document.getElementById("addImagePreview").style.display = "none";
                     document.getElementById("itemExtrasList").innerHTML = "";
                     document.getElementById("itemKitchenAssigned").checked = false;
+                    document.getElementById("itemKitchenStation").value = "";
                     addImageData = "";
                     document.getElementById("addResult").innerText = t("added");
                     if (kitchenAssigned) {
@@ -2107,6 +2207,7 @@
             document.getElementById("editPrice").value = item.price;
             document.getElementById("editStock").value = (item.stock === null || item.stock === undefined) ? "" : item.stock;
             document.getElementById("editKitchenAssigned").checked = !!item.kitchen_assigned;
+            document.getElementById("editKitchenStation").value = item.kitchen_station || "";
             document.getElementById("editDesc").value = item.description || "";
             autoGrow(document.getElementById("editDesc"));
             document.getElementById("editCategory").value = item.category || "other";
@@ -2143,6 +2244,7 @@
             const payload = { name, price, description: desc, category, extras };
             if (image) payload.image = image;
             payload.kitchen_assigned = document.getElementById("editKitchenAssigned").checked ? 1 : 0;
+            payload.kitchen_station = document.getElementById("editKitchenStation").value.trim();
 
             if (stockVal === "") {
                 payload.clear_stock = true;
