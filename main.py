@@ -1290,6 +1290,11 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
     menu_row = get_menu_item_row(order["item"])
     category = menu_row["category"] if menu_row and menu_row.get("category") else "other"
 
+    if menu_row and menu_row.get("stock") is not None and menu_row["stock"] < order["qty"]:
+        cur.close()
+        conn.close()
+        return {"error": f"Not enough stock for {order['item']} (available: {menu_row['stock']}, requested: {order['qty']})"}
+
     kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
 
     now_utc = datetime.utcnow()
@@ -1341,11 +1346,17 @@ def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wa
 
     now_utc = datetime.utcnow()
     approved_ids = []
+    skipped = []
     for order in pending:
-        extras_list = parse_extras(order.get("extras"))
-        extras_text = ", ".join(e.get("name", "") for e in extras_list)
         menu_row = get_menu_item_row(order["item"])
         category = menu_row["category"] if menu_row and menu_row.get("category") else "other"
+
+        if menu_row and menu_row.get("stock") is not None and menu_row["stock"] < order["qty"]:
+            skipped.append({"order_id": order["order_id"], "item": order["item"], "available": menu_row["stock"], "requested": order["qty"]})
+            continue
+
+        extras_list = parse_extras(order.get("extras"))
+        extras_text = ", ".join(e.get("name", "") for e in extras_list)
         send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
         cur.execute(
             "UPDATE orders SET status = 'APPROVED', handled_by = %s, approved_at = %s WHERE order_id = %s",
@@ -1364,7 +1375,7 @@ def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wa
 
     log_action(waiter_name, "approved all orders", session_id)
 
-    return {"session_id": session_id, "approved_count": len(approved_ids)}
+    return {"session_id": session_id, "approved_count": len(approved_ids), "skipped": skipped}
 
 
 @app.post("/orders/{order_id}/reject")
