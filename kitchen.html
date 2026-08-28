@@ -6,6 +6,54 @@
         body { font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; }
         h1 { text-align: center; font-size: 36px; margin-bottom: 30px; }
 
+        .stock-panel {
+            background: #2c2c2c;
+            border-radius: 10px;
+            padding: 18px 22px;
+            margin-bottom: 30px;
+        }
+        .stock-panel-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #ccc;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stock-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .stock-item-btn {
+            background: #3a3a3a;
+            color: white;
+            border: 2px solid #4a4a4a;
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.1s;
+        }
+        .stock-item-btn:active { transform: scale(0.96); }
+        .stock-item-btn.out {
+            background: #4d1f1f;
+            border-color: #e74c3c;
+            color: #ff9d9d;
+        }
+        .stock-item-btn .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #27ae60;
+        }
+        .stock-item-btn.out .dot {
+            background: #e74c3c;
+        }
+
         .category-section { margin-bottom: 36px; }
         .category-heading {
             font-size: 26px;
@@ -82,6 +130,12 @@
 </head>
 <body>
     <h1>🔥 Kitchen Display</h1>
+
+    <div class="stock-panel" id="stockPanel" style="display:none;">
+        <div class="stock-panel-title">📦 Stock Status — tap an item if it runs out</div>
+        <div class="stock-items" id="stockItems"></div>
+    </div>
+
     <div id="categorySections"></div>
 
     <script>
@@ -191,8 +245,48 @@
                 .catch(() => loadTickets());
         }
 
+        function loadStockPanel() {
+            fetch(`${BASE}/menu-items`)
+                .then(r => r.json())
+                .then(items => {
+                    const assigned = (items || []).filter(i => i.kitchen_assigned);
+                    const panel = document.getElementById("stockPanel");
+                    const list = document.getElementById("stockItems");
+
+                    if (!assigned.length) {
+                        panel.style.display = "none";
+                        return;
+                    }
+
+                    panel.style.display = "block";
+                    list.innerHTML = assigned.map(item => {
+                        const isOut = !!item.kitchen_out;
+                        return `
+                            <button class="stock-item-btn ${isOut ? 'out' : ''}" onclick="toggleKitchenOut('${item.item_id}', ${isOut ? 0 : 1}, this)">
+                                <span class="dot"></span>
+                                ${escapeHtml(item.name)} ${isOut ? '— OUT' : ''}
+                            </button>
+                        `;
+                    }).join("");
+                });
+        }
+
+        function toggleKitchenOut(itemId, out, btn) {
+            btn.disabled = true;
+            fetch(`${BASE}/menu-items/${itemId}/kitchen-out?out=${out}`, { method: "POST" })
+                .then(r => r.json())
+                .then(() => {
+                    loadStockPanel();
+                })
+                .catch(() => {
+                    btn.disabled = false;
+                });
+        }
+
         loadTickets();
+        loadStockPanel();
         setInterval(loadTickets, 3000);
+        setInterval(loadStockPanel, 5000);
 
         </script>
 </body>
