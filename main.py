@@ -53,6 +53,7 @@ class MenuItemUpdate(BaseModel):
     extras: Optional[List[MenuItemExtra]] = None
     stock: Optional[int] = None
     clear_stock: bool = False
+    kitchen_assigned: Optional[int] = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -244,6 +245,18 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN stock INTEGER")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN kitchen_assigned INTEGER DEFAULT 0")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN kitchen_out INTEGER DEFAULT 0")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
         conn.rollback()
@@ -540,8 +553,10 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
     else:
         new_stock = item["stock"]
 
+    new_kitchen_assigned = payload.kitchen_assigned if payload.kitchen_assigned is not None else item.get("kitchen_assigned", 0)
+
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, stock=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, stock=%s, kitchen_assigned=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
@@ -551,6 +566,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
             payload.category if payload.category is not None else item["category"],
             extras_json,
             new_stock,
+            new_kitchen_assigned,
             item_id,
         ),
     )
@@ -561,6 +577,33 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
     log_action(waiter_name, "updated menu item", item_id)
 
     return {"item_id": item_id, "updated": True}
+
+
+@app.post("/menu-items/{item_id}/kitchen-out")
+def set_kitchen_out(item_id: str, out: int):
+    conn = get_connection()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM menu_items WHERE item_id = %s", (item_id,))
+    item = cur.fetchone()
+
+    if item is None:
+        cur.close()
+        conn.close()
+        return {"error": "Item not found"}
+
+    if not item.get("kitchen_assigned"):
+        cur.close()
+        conn.close()
+        return {"error": "This item isn't assigned to kitchen reporting"}
+
+    cur.execute("UPDATE menu_items SET kitchen_out = %s WHERE item_id = %s", (1 if out else 0, item_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    log_action("Kitchen", "reported item out of stock" if out else "reported item back in stock", item_id)
+
+    return {"item_id": item_id, "kitchen_out": bool(out)}
 
 
 @app.delete("/menu-items/{item_id}")
