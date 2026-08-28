@@ -55,6 +55,7 @@
         .toast.pay { border-left-color: #7c3aed; }
         .toast.ready { border-left-color: #d81b60; }
         .toast.stock { border-left-color: #c0392b; }
+        .toast.stock_shortage { border-left-color: #c0392b; }
         .toast .toast-icon { font-size: 22px; }
         .toast .toast-text { flex: 1; }
         .toast .toast-title { font-weight: 800; font-size: 14px; }
@@ -534,6 +535,7 @@
                 order_ready_banner: "✅ ΕΤΟΙΜΟ ΠΡΟΣ ΠΑΡΑΛΑΒΗ",
                 order_ready_alert: (n) => `${n} παραγγελία(ες) έτοιμες προς παραλαβή`,
                 out_of_stock_alert: (n) => `📦 Τελείωσε το απόθεμα (${n})`,
+                stock_shortage_alert: (item, req, avail) => `📦 ${item}: χρειάζεται ${req}, απομένουν ${avail}`,
                 ready_tag: "✅ Έτοιμο",
                 picked_up: "Παρέλαβα",
                 accept_all: "Αποδοχή Όλων",
@@ -629,6 +631,7 @@
                 order_ready_banner: "✅ READY FOR PICKUP",
                 order_ready_alert: (n) => `${n} order(s) ready for pickup`,
                 out_of_stock_alert: (n) => `📦 Out of stock (${n})`,
+                stock_shortage_alert: (item, req, avail) => `📦 ${item}: needs ${req}, only ${avail} left`,
                 ready_tag: "✅ Ready",
                 picked_up: "Picked Up",
                 accept_all: "Accept All",
@@ -725,7 +728,7 @@
 
         function showToast(alert) {
             const container = document.getElementById("toastContainer");
-            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : alert.type === "ready" ? "ready" : alert.type === "stock" ? "stock" : "";
+            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : alert.type === "ready" ? "ready" : (alert.type === "stock" || alert.type === "stock_shortage") ? "stock" : "";
             const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : toastClass === "ready" ? "✅" : toastClass === "stock" ? "📦" : "🧾";
 
             const toast = document.createElement("div");
@@ -969,6 +972,9 @@
                     readyCountBySession[o.session_id] = (readyCountBySession[o.session_id] || 0) + 1;
                 });
 
+                const menuItemsById = {};
+                (menuItems || []).forEach(m => { menuItemsById[m.item_id] = m; });
+
                 const sessionFetches = tables
                     .filter(t => t.active_session_id)
                     .map(t =>
@@ -981,6 +987,11 @@
                     const sessionByTableId = {};
                     results.forEach(r => {
                         if (!r.session.error) sessionByTableId[r.table_id] = r.session;
+                    });
+
+                    const sessionIdToTableId = {};
+                    Object.keys(sessionByTableId).forEach(tid => {
+                        sessionIdToTableId[sessionByTableId[tid].session_id] = tid;
                     });
 
                     currentAlerts = [];
@@ -1090,14 +1101,31 @@
 
                     const outOfStockItems = (menuItems || []).filter(i => i.stock !== null && i.stock !== undefined && i.stock <= 0);
                     outOfStockItems.forEach(item => {
-                        currentAlerts.push({ tableId: null, label: item.name, text: t("out_of_stock_alert", item.stock), type: "stock" });
+                        currentAlerts.push({ tableId: null, label: item.name, text: t("out_of_stock_alert", item.stock), key: item.item_id, type: "stock" });
+                    });
+
+                    pendingOrders.forEach(o => {
+                        const tableId = sessionIdToTableId[o.session_id];
+                        if (!tableId) return;
+                        const menuItem = menuItemsById[o.item];
+                        if (menuItem && menuItem.stock !== null && menuItem.stock !== undefined && o.qty > menuItem.stock) {
+                            const tbl = tables.find(tb => tb.table_id === tableId);
+                            const label = tbl ? (tbl.display_label || tbl.table_id) : tableId;
+                            currentAlerts.push({
+                                tableId,
+                                label,
+                                text: t("stock_shortage_alert", menuItem.name, o.qty, menuItem.stock),
+                                key: o.order_id,
+                                type: "stock_shortage"
+                            });
+                        }
                     });
 
                     previousPendingCounts = newPendingCounts;
                     previousReadyCounts = newReadyCounts;
 
-                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}-${a.label}`));
-                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && a.type !== "ready" && !previousAlertKeys.has(`${a.tableId}-${a.type}-${a.label}`));
+                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}-${a.label}-${a.key || ''}`));
+                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && a.type !== "ready" && !previousAlertKeys.has(`${a.tableId}-${a.type}-${a.label}-${a.key || ''}`));
                     const allTriggerEvents = newStatusAlerts.concat(newOrderEvents);
 
                     if (allTriggerEvents.length > 0 && hasLoadedTablesOnce) {
@@ -1381,7 +1409,7 @@
                 .then(data => {
                     if (!data) return;
                     if (data.error) {
-                        document.getElementById("modalResult").innerText = data.error;
+                        alert(data.error);
                         return;
                     }
                     openTableModal(currentTableId);
@@ -1397,16 +1425,13 @@
                 .then(data => {
                     if (!data) return;
                     if (data.error) {
-                        document.getElementById("modalResult").innerText = data.error;
+                        alert(data.error);
                         return;
                     }
                     openTableModal(currentTableId);
                     loadTables();
                     if (data.skipped && data.skipped.length > 0) {
-                        setTimeout(() => {
-                            const resultEl = document.getElementById("modalResult");
-                            if (resultEl) resultEl.innerText = t("skipped_stock_msg", data.skipped.length);
-                        }, 300);
+                        alert(t("skipped_stock_msg", data.skipped.length));
                     }
                 });
         }
