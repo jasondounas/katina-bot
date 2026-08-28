@@ -41,6 +41,7 @@ class MenuItemCreate(BaseModel):
     category: str = "other"
     extras: List[MenuItemExtra] = []
     stock: Optional[int] = None
+    kitchen_station: Optional[str] = None
 
 
 class MenuItemUpdate(BaseModel):
@@ -54,6 +55,7 @@ class MenuItemUpdate(BaseModel):
     stock: Optional[int] = None
     clear_stock: bool = False
     kitchen_assigned: Optional[int] = None
+    kitchen_station: Optional[str] = None
 
 
 def verify_waiter(x_waiter_token: str = Header(None)):
@@ -257,6 +259,12 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE menu_items ADD COLUMN kitchen_out INTEGER DEFAULT 0")
+        conn.commit()
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE menu_items ADD COLUMN kitchen_station TEXT")
         conn.commit()
     except psycopg2.errors.DuplicateColumn:
         conn.rollback()
@@ -503,8 +511,8 @@ def add_menu_item(payload: MenuItemCreate, _auth: None = Depends(verify_waiter),
     extras_json = json.dumps([e.dict() for e in payload.extras])
 
     cur.execute(
-        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras, stock) VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s)",
-        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json, payload.stock),
+        "INSERT INTO menu_items (item_id, name, price, description, image, available, category, extras, stock, kitchen_station) VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s)",
+        (payload.item_id, payload.name, payload.price, payload.description, payload.image, payload.category, extras_json, payload.stock, payload.kitchen_station),
     )
     conn.commit()
     cur.close()
@@ -554,9 +562,10 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
         new_stock = item["stock"]
 
     new_kitchen_assigned = payload.kitchen_assigned if payload.kitchen_assigned is not None else item.get("kitchen_assigned", 0)
+    new_kitchen_station = payload.kitchen_station if payload.kitchen_station is not None else item.get("kitchen_station")
 
     cur.execute(
-        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, stock=%s, kitchen_assigned=%s WHERE item_id=%s",
+        "UPDATE menu_items SET name=%s, price=%s, description=%s, image=%s, available=%s, category=%s, extras=%s, stock=%s, kitchen_assigned=%s, kitchen_station=%s WHERE item_id=%s",
         (
             payload.name if payload.name is not None else item["name"],
             payload.price if payload.price is not None else item["price"],
@@ -567,6 +576,7 @@ def update_menu_item(item_id: str, payload: MenuItemUpdate, _auth: None = Depend
             extras_json,
             new_stock,
             new_kitchen_assigned,
+            new_kitchen_station,
             item_id,
         ),
     )
@@ -1276,7 +1286,7 @@ def submit_order(session_id: str, item: str, qty: int, idempotency_key: str = No
     }
 
 
-def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "", category: str = "other") -> str:
+def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "", category: str = "other", station: str = "") -> str:
     for attempt in range(1, 3):
         try:
             response = httpx.post(
@@ -1289,6 +1299,7 @@ def send_kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extr
                     "extras": extras,
                     "table_label": table_label,
                     "category": category,
+                    "station": station or "",
                 },
                 timeout=5.0,
             )
@@ -1338,7 +1349,8 @@ def approve_order(order_id: str, _auth: None = Depends(verify_waiter), waiter_na
         conn.close()
         return {"error": f"Not enough stock for {order['item']} (available: {menu_row['stock']}, requested: {order['qty']})"}
 
-    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
+    station = menu_row.get("kitchen_station") if menu_row else None
+    kitchen_status = send_kitchen_ticket(order_id, order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category, station or "")
 
     now_utc = datetime.utcnow()
 
@@ -1400,7 +1412,8 @@ def approve_all_orders(session_id: str, _auth: None = Depends(verify_waiter), wa
 
         extras_list = parse_extras(order.get("extras"))
         extras_text = ", ".join(e.get("name", "") for e in extras_list)
-        send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category)
+        station = menu_row.get("kitchen_station") if menu_row else None
+        send_kitchen_ticket(order["order_id"], order["item"], order["qty"], order.get("note") or "", extras_text, table_label, category, station or "")
         cur.execute(
             "UPDATE orders SET status = 'APPROVED', handled_by = %s, approved_at = %s WHERE order_id = %s",
             (waiter_name, now_utc, order["order_id"]),
