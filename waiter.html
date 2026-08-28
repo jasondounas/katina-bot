@@ -54,6 +54,7 @@
         .toast.called { border-left-color: #f39c12; }
         .toast.pay { border-left-color: #7c3aed; }
         .toast.ready { border-left-color: #d81b60; }
+        .toast.stock { border-left-color: #c0392b; }
         .toast .toast-icon { font-size: 22px; }
         .toast .toast-text { flex: 1; }
         .toast .toast-title { font-weight: 800; font-size: 14px; }
@@ -532,6 +533,7 @@
                 new_orders: (n) => `🧾 ${n} ${n > 1 ? "ΝΕΕΣ ΠΑΡΑΓΓΕΛΕΙΕΣ" : "ΝΕΑ ΠΑΡΑΓΓΕΛΙΑ"}`,
                 order_ready_banner: "✅ ΕΤΟΙΜΟ ΠΡΟΣ ΠΑΡΑΛΑΒΗ",
                 order_ready_alert: (n) => `${n} παραγγελία(ες) έτοιμες προς παραλαβή`,
+                out_of_stock_alert: (n) => `📦 Τελείωσε το απόθεμα (${n})`,
                 ready_tag: "✅ Έτοιμο",
                 picked_up: "Παρέλαβα",
                 accept_all: "Αποδοχή Όλων",
@@ -571,6 +573,7 @@
                 rename_prompt: "Μετονομασία τραπεζιού:",
                 party_size_prompt: "Ενημέρωση αριθμού ατόμων:",
                 delete_session_confirm: "Διαγραφή αυτής της συνεδρίας; Αυτό ακυρώνει όλες τις παραγγελίες της.",
+                skipped_stock_msg: (n) => `⚠️ ${n} παραγγελία(ες) δεν εγκρίθηκαν λόγω ανεπαρκούς αποθέματος.`,
                 action_labels: {
                     "registered table": "καταχώρησε τραπέζι",
                     "deleted table": "διέγραψε τραπέζι",
@@ -625,6 +628,7 @@
                 new_orders: (n) => `🧾 ${n} NEW ORDER${n > 1 ? "S" : ""}`,
                 order_ready_banner: "✅ READY FOR PICKUP",
                 order_ready_alert: (n) => `${n} order(s) ready for pickup`,
+                out_of_stock_alert: (n) => `📦 Out of stock (${n})`,
                 ready_tag: "✅ Ready",
                 picked_up: "Picked Up",
                 accept_all: "Accept All",
@@ -664,6 +668,7 @@
                 rename_prompt: "Rename table:",
                 party_size_prompt: "Update party size:",
                 delete_session_confirm: "Delete this session? This cancels all its orders.",
+                skipped_stock_msg: (n) => `⚠️ ${n} order(s) were not approved due to insufficient stock.`,
                 action_labels: {}
             }
         };
@@ -720,8 +725,8 @@
 
         function showToast(alert) {
             const container = document.getElementById("toastContainer");
-            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : alert.type === "ready" ? "ready" : "";
-            const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : toastClass === "ready" ? "✅" : "🧾";
+            const toastClass = alert.type === "called" ? "called" : alert.type === "pay" ? "pay" : alert.type === "ready" ? "ready" : alert.type === "stock" ? "stock" : "";
+            const icon = toastClass === "called" ? "🔔" : toastClass === "pay" ? "💳" : toastClass === "ready" ? "✅" : toastClass === "stock" ? "📦" : "🧾";
 
             const toast = document.createElement("div");
             toast.className = `toast ${toastClass}`;
@@ -920,19 +925,23 @@
                 list.innerHTML = `<div class="notif-empty">${t("no_alerts")}</div>`;
                 return;
             }
-            list.innerHTML = currentAlerts.map(a => `
-                <div class="notif-row" onclick="jumpToTable('${a.tableId}')">
+            list.innerHTML = currentAlerts.map(a => {
+                const clickAttr = a.tableId ? `onclick="jumpToTable('${a.tableId}')"` : `onclick="closeAllDrawers()"`;
+                return `
+                <div class="notif-row" ${clickAttr}>
                     <div class="info">
                         <div class="table-name">${escapeHtml(a.label)}</div>
                         <div class="type">${escapeHtml(a.text)}</div>
                     </div>
                     <div class="go">→</div>
                 </div>
-            `).join("");
+            `;
+            }).join("");
         }
 
         function jumpToTable(tableId) {
             closeAllDrawers();
+            if (!tableId) return;
             openTableModal(tableId);
         }
 
@@ -942,7 +951,8 @@
                 fetch(`${BASE}/orders/pending`).then(r => r.json()),
                 fetch(`${BASE}/orders/ready`).then(r => r.json()),
                 fetch(`${BASE}/settings`).then(r => r.json()).catch(() => ({})),
-            ]).then(([tables, pendingOrders, readyOrders, settings]) => {
+                fetch(`${BASE}/menu-items`).then(r => r.json()).catch(() => []),
+            ]).then(([tables, pendingOrders, readyOrders, settings, menuItems]) => {
 
                 tableStatusMode = (settings && settings.table_status_mode) || "simple";
 
@@ -1078,11 +1088,16 @@
                         `;
                     });
 
+                    const outOfStockItems = (menuItems || []).filter(i => i.stock !== null && i.stock !== undefined && i.stock <= 0);
+                    outOfStockItems.forEach(item => {
+                        currentAlerts.push({ tableId: null, label: item.name, text: t("out_of_stock_alert", item.stock), type: "stock" });
+                    });
+
                     previousPendingCounts = newPendingCounts;
                     previousReadyCounts = newReadyCounts;
 
-                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}`));
-                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && a.type !== "ready" && !previousAlertKeys.has(`${a.tableId}-${a.type}`));
+                    const currentAlertKeys = new Set(currentAlerts.map(a => `${a.tableId}-${a.type}-${a.label}`));
+                    const newStatusAlerts = currentAlerts.filter(a => a.type !== "orders" && a.type !== "ready" && !previousAlertKeys.has(`${a.tableId}-${a.type}-${a.label}`));
                     const allTriggerEvents = newStatusAlerts.concat(newOrderEvents);
 
                     if (allTriggerEvents.length > 0 && hasLoadedTablesOnce) {
@@ -1387,6 +1402,12 @@
                     }
                     openTableModal(currentTableId);
                     loadTables();
+                    if (data.skipped && data.skipped.length > 0) {
+                        setTimeout(() => {
+                            const resultEl = document.getElementById("modalResult");
+                            if (resultEl) resultEl.innerText = t("skipped_stock_msg", data.skipped.length);
+                        }, 300);
+                    }
                 });
         }
 
