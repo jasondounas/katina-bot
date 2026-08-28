@@ -19,8 +19,8 @@ def root():
 
 
 @app.post("/kitchen-ticket")
-def kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "", category: str = "other"):
-    print(f"🧾 KITCHEN TICKET [{category}] — {table_label or order_id}: {qty}x {item}" + (f" (extras: {extras})" if extras else "") + (f" (note: {note})" if note else ""))
+def kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: str = "", table_label: str = "", category: str = "other", station: str = ""):
+    print(f"🧾 KITCHEN TICKET [{category}]{f' [{station}]' if station else ''} — {table_label or order_id}: {qty}x {item}" + (f" (extras: {extras})" if extras else "") + (f" (note: {note})" if note else ""))
     kitchen_tickets.append({
         "order_id": order_id,
         "item": item,
@@ -29,6 +29,7 @@ def kitchen_ticket(order_id: str, item: str, qty: int, note: str = "", extras: s
         "extras": extras,
         "table_label": table_label,
         "category": category,
+        "station": station,
         "done": False,
     })
     return {"success": True}
