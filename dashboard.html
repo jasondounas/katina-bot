@@ -448,6 +448,26 @@
         }
         .edit-modal label { font-size: 12px; color: #777; font-weight: 700; display:block; margin-bottom:4px; }
         .stock-hint { font-size: 11.5px; color: #999; margin: -6px 0 10px; }
+        .kitchen-checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0 14px;
+            font-size: 13px;
+            color: #555;
+            font-weight: 600;
+        }
+        .kitchen-checkbox-row input { width: auto; margin: 0; }
+        .kitchen-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 8px;
+            margin-left: 6px;
+            display: inline-block;
+        }
+        .kitchen-badge.assigned { background: #e6f0fc; color: #1d5fd7; }
+        .kitchen-badge.out { background: #fce8e6; color: #c0392b; }
 
         .period-toggle {
             display: flex;
@@ -668,6 +688,11 @@
             <input type="file" id="itemImageFile" accept="image/*" style="display:none;" onchange="handleAddImageFile(this)">
             <img class="image-preview" id="addImagePreview">
 
+            <div class="kitchen-checkbox-row">
+                <input type="checkbox" id="itemKitchenAssigned">
+                <label for="itemKitchenAssigned" id="itemKitchenAssignedLabel" style="cursor:pointer;">Let kitchen report this out of stock</label>
+            </div>
+
             <div class="extras-section">
                 <span class="extras-label" id="itemExtrasLabel">Extras (optional add-ons)</span>
                 <div id="itemExtrasList"></div>
@@ -706,6 +731,11 @@
             <input type="text" id="editImageUrl" placeholder="Image URL">
             <input type="file" id="editImageFile" accept="image/*" style="display:none;" onchange="handleEditImageFile(this)">
             <img class="image-preview" id="editImagePreview">
+
+            <div class="kitchen-checkbox-row">
+                <input type="checkbox" id="editKitchenAssigned">
+                <label for="editKitchenAssigned" id="editKitchenAssignedLabel" style="cursor:pointer;">Let kitchen report this out of stock</label>
+            </div>
 
             <div class="extras-section">
                 <span class="extras-label" id="editExtrasLabel">Extras (optional add-ons)</span>
@@ -853,6 +883,10 @@
                 extras_summary: (list) => `+ ${list}`,
                 stock_summary: (n) => `📦 Απόθεμα: ${n}`,
                 out_of_stock_label: "📦 Εξαντλήθηκε",
+                kitchen_assigned_checkbox: "Να μπορεί η κουζίνα να δηλώσει ότι τελείωσε",
+                kitchen_out_alert: (n) => `👨‍🍳 Η κουζίνα δήλωσε ότι τελείωσε: ${n}`,
+                kitchen_out_badge: "👨‍🍳 Τελείωσε (κουζίνα)",
+                kitchen_assigned_badge: "👨‍🍳 Κουζίνα",
                 analytics: "Αναλυτικά Στοιχεία",
                 revenue_trend: "Τάση Εσόδων",
                 top_items: "Δημοφιλέστερα Προϊόντα (Όλες οι Κατηγορίες)",
@@ -908,7 +942,9 @@
                     "deleted menu item": "διέγραψε προϊόν μενού",
                     "moved table": "μετακίνησε τραπέζι",
                     "cleared kitchen queue": "καθάρισε την ουρά κουζίνας",
-                    "changed table status mode": "άλλαξε τη λειτουργία κατάστασης τραπεζιών"
+                    "changed table status mode": "άλλαξε τη λειτουργία κατάστασης τραπεζιών",
+                    "reported item out of stock": "δήλωσε προϊόν εκτός αποθέματος",
+                    "reported item back in stock": "δήλωσε προϊόν ξανά διαθέσιμο"
                 }
             },
             en: {
@@ -992,6 +1028,10 @@
                 extras_summary: (list) => `+ ${list}`,
                 stock_summary: (n) => `📦 Stock: ${n}`,
                 out_of_stock_label: "📦 Out of stock",
+                kitchen_assigned_checkbox: "Let kitchen report this out of stock",
+                kitchen_out_alert: (n) => `👨‍🍳 Kitchen reported out: ${n}`,
+                kitchen_out_badge: "👨‍🍳 Out (kitchen)",
+                kitchen_assigned_badge: "👨‍🍳 Kitchen",
                 analytics: "Analytics",
                 revenue_trend: "Revenue Trend",
                 top_items: "Top-Selling Items (All Categories)",
@@ -1098,6 +1138,8 @@
             document.getElementById("editPriceLabel").innerText = t("price_label");
             document.getElementById("editStockLabel").innerText = t("stock_label");
             document.getElementById("stockHint").innerText = t("stock_hint");
+            document.getElementById("itemKitchenAssignedLabel").innerText = t("kitchen_assigned_checkbox");
+            document.getElementById("editKitchenAssignedLabel").innerText = t("kitchen_assigned_checkbox");
             document.getElementById("editDescLabel").innerText = t("desc_label");
             document.getElementById("editCategoryLabel").innerText = t("category_label");
             document.getElementById("editImageLabel").innerText = t("image_label");
@@ -1448,6 +1490,15 @@
                     alertsHtml += `
                         <div class="alert-row stock">
                             <div><div class="table-name">${escapeHtml(item.name)}</div><div class="type">${t("out_of_stock_alert", item.stock)}</div></div>
+                        </div>
+                    `;
+                });
+
+                const kitchenOutItems = (menuItems || []).filter(i => i.kitchen_assigned && i.kitchen_out);
+                kitchenOutItems.forEach(item => {
+                    alertsHtml += `
+                        <div class="alert-row stock">
+                            <div><div class="table-name">${escapeHtml(item.name)}</div><div class="type">${t("kitchen_out_alert", item.name)}</div></div>
                         </div>
                     `;
                 });
@@ -1938,6 +1989,9 @@
                             const stockHtml = hasStock
                                 ? `<div class="stock-summary ${isOut ? 'low' : 'ok'}">${isOut ? t("out_of_stock_label") : t("stock_summary", item.stock)}</div>`
                                 : "";
+                            const kitchenBadge = item.kitchen_assigned
+                                ? `<span class="kitchen-badge ${item.kitchen_out ? 'out' : 'assigned'}">${item.kitchen_out ? t("kitchen_out_badge") : t("kitchen_assigned_badge")}</span>`
+                                : "";
                             return `
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'} ${isOut ? 'out-of-stock' : ''}">
                                 <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
@@ -1947,6 +2001,7 @@
                                     <div class="desc">${escapeHtml(item.description || '')}</div>
                                     ${extrasList ? `<div class="extras-summary">${t("extras_summary", extrasList)}</div>` : ""}
                                     ${stockHtml}
+                                    ${kitchenBadge}
                                 </div>
                                 <div class="item-actions">
                                     <button class="secondary" onclick="toggleAvailable('${item.item_id}', ${item.available ? 0 : 1})">${item.available ? t("hide") : t("show")}</button>
@@ -1973,6 +2028,7 @@
             const urlVisible = document.getElementById("itemImageUrl").style.display !== "none";
             const image = urlVisible ? document.getElementById("itemImageUrl").value : addImageData;
             const extras = collectExtras("itemExtrasList");
+            const kitchenAssigned = document.getElementById("itemKitchenAssigned").checked ? 1 : 0;
 
             if (!id || !name || !price) {
                 document.getElementById("addResult").innerText = t("required_fields");
@@ -2009,9 +2065,17 @@
                     document.getElementById("itemImageFile").value = "";
                     document.getElementById("addImagePreview").style.display = "none";
                     document.getElementById("itemExtrasList").innerHTML = "";
+                    document.getElementById("itemKitchenAssigned").checked = false;
                     addImageData = "";
                     document.getElementById("addResult").innerText = t("added");
-                    loadMenuItems();
+                    if (kitchenAssigned) {
+                        authFetchJson(`${BASE}/menu-items/${id}/update`, {
+                            method: "POST",
+                            body: JSON.stringify({ kitchen_assigned: 1 })
+                        }).then(() => loadMenuItems());
+                    } else {
+                        loadMenuItems();
+                    }
                 });
         }
 
@@ -2042,6 +2106,7 @@
             document.getElementById("editName").value = item.name;
             document.getElementById("editPrice").value = item.price;
             document.getElementById("editStock").value = (item.stock === null || item.stock === undefined) ? "" : item.stock;
+            document.getElementById("editKitchenAssigned").checked = !!item.kitchen_assigned;
             document.getElementById("editDesc").value = item.description || "";
             autoGrow(document.getElementById("editDesc"));
             document.getElementById("editCategory").value = item.category || "other";
@@ -2077,6 +2142,7 @@
 
             const payload = { name, price, description: desc, category, extras };
             if (image) payload.image = image;
+            payload.kitchen_assigned = document.getElementById("editKitchenAssigned").checked ? 1 : 0;
 
             if (stockVal === "") {
                 payload.clear_stock = true;
