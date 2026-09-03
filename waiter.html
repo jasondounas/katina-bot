@@ -4,26 +4,75 @@
     <title>Katina — Waiter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Commissioner:wght@300..700&family=GFS+Didot&display=swap');
+
+        :root {
+            /* light surfaces — the main page */
+            --screen: #f7f6f2;
+            --surface: #fdfcfa;
+            --surface-2: #f1efe9;
+            --text: #1a1714;
+            --text-2: #453d33;
+            --text-3: #6e6558;
+            --text-4: #8a8071;
+            --accent: #8f6210;
+            --accent-hover: #7a5309;
+            --on-accent: #ffffff;
+            --accent-soft: rgba(143, 98, 16, 0.10);
+            --accent-line: rgba(143, 98, 16, 0.34);
+            --live: #1f6f63;
+            --live-soft: rgba(31, 111, 99, 0.11);
+            --warn: #9e3f1f;
+            --warn-soft: rgba(158, 63, 31, 0.10);
+            --warn-line: rgba(158, 63, 31, 0.32);
+            --line: rgba(26, 23, 20, 0.13);
+            --line-mid: rgba(26, 23, 20, 0.16);
+            --hover: rgba(26, 23, 20, 0.04);
+            --card-shadow: 0 1px 2px rgba(26, 23, 20, 0.04), 0 8px 22px rgba(26, 23, 20, 0.06);
+
+            /* dark surfaces — header, login screen, drawers, toasts */
+            --d-bg: #221e19;
+            --d-bg-2: #2d2620;
+            --d-surface: #1e1915;
+            --d-text: #f6f3ed;
+            --d-text-3: #9c9082;
+            --d-text-4: rgba(246, 243, 237, 0.55);
+            --d-accent: #d9a75b;
+            --d-line: rgba(239, 233, 224, 0.09);
+            --d-hover: rgba(239, 233, 224, 0.07);
+            --d-hover-2: rgba(239, 233, 224, 0.13);
+
+            --display: 'GFS Didot', 'Didot', 'Iowan Old Style', Georgia, serif;
+            --ui: 'Commissioner', 'Helvetica Neue', Arial, sans-serif;
+            --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+            --r-sm: 6px;
+            --r-md: 10px;
+            --r-lg: 14px;
+            --r-sheet: 22px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            background: #f7f5f2;
-            color: #1a1a1a;
+            font-family: var(--ui);
+            background: var(--screen);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
         }
 
         .spinner {
             width: 22px; height: 22px;
-            border: 3px solid rgba(0,0,0,0.1);
-            border-top-color: #ff6b35;
+            border: 3px solid rgba(26,23,20,0.1);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             display: inline-block;
         }
-        .spinner.light { border-color: rgba(255,255,255,0.25); border-top-color: white; }
+        .spinner.light { border-color: rgba(246,243,237,0.25); border-top-color: var(--d-text); }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-block {
             display: flex; flex-direction: column; align-items: center; gap: 14px;
-            padding: 60px 20px; color: #999; font-size: 14px;
+            padding: 60px 20px; color: var(--text-4); font-size: 14px;
             grid-column: 1 / -1;
         }
 
@@ -39,27 +88,27 @@
             max-width: 400px;
         }
         .toast {
-            background: #1a1a1a;
-            color: white;
+            background: var(--d-bg);
+            color: var(--d-text);
             padding: 16px 20px;
-            border-radius: 16px;
+            border-radius: var(--r-lg);
             box-shadow: 0 8px 24px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             gap: 12px;
             cursor: pointer;
             animation: slideDown 0.3s ease, fadeOut 0.3s ease 4.5s forwards;
-            border-left: 5px solid #ff6b35;
+            border-left: 4px solid var(--d-accent);
         }
         .toast.called { border-left-color: #f39c12; }
         .toast.pay { border-left-color: #7c3aed; }
         .toast.ready { border-left-color: #d81b60; }
-        .toast.stock { border-left-color: #c0392b; }
-        .toast.stock_shortage { border-left-color: #c0392b; }
+        .toast.stock { border-left-color: var(--warn); }
+        .toast.stock_shortage { border-left-color: var(--warn); }
         .toast .toast-icon { font-size: 22px; }
         .toast .toast-text { flex: 1; }
-        .toast .toast-title { font-weight: 800; font-size: 14px; }
-        .toast .toast-sub { font-size: 12px; color: #ccc; margin-top: 2px; }
+        .toast .toast-title { font-weight: 700; font-size: 14px; }
+        .toast .toast-sub { font-size: 12px; color: var(--d-text-4); margin-top: 2px; }
 
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-20px); }
@@ -71,60 +120,63 @@
 
         .login-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            background: linear-gradient(135deg, var(--d-bg), var(--d-bg-2));
             display: flex; align-items: center; justify-content: center;
             z-index: 100;
         }
         .login-box {
-            background: white;
-            border-radius: 24px;
+            background: var(--surface);
+            border-radius: var(--r-sheet);
             padding: 36px;
             width: 90%;
             max-width: 380px;
             text-align: center;
+            box-shadow: var(--card-shadow);
         }
         .login-box .logo {
             width: 60px; height: 60px;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            border-radius: 18px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            border-radius: var(--r-lg);
             display: flex; align-items: center; justify-content: center;
             font-size: 28px;
             margin: 0 auto 20px;
         }
-        .login-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-        .login-box p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .login-box h2 { font-family: var(--display); font-weight: 400; font-size: 24px; margin-bottom: 8px; }
+        .login-box p { color: var(--text-3); font-size: 14px; margin-bottom: 20px; }
         .login-box input {
             width: 100%;
             padding: 14px;
-            border: 1.5px solid #eee;
-            border-radius: 12px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 16px;
             text-align: center;
             margin-bottom: 12px;
+            font-family: var(--ui);
         }
         .login-box button {
             width: 100%;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            color: white;
+            background: var(--accent);
+            color: var(--on-accent);
             border: none;
             padding: 14px;
-            border-radius: 12px;
+            border-radius: var(--r-md);
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
+            font-family: var(--ui);
         }
-        .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+        .login-error { color: var(--warn); font-size: 13px; margin-top: 10px; min-height: 18px; }
         .login-lang-toggle {
             position: absolute; top: 20px; right: 20px;
-            background: rgba(255,255,255,0.1); color: white; border: none;
-            padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
-            cursor: pointer;
+            background: var(--d-hover); color: var(--d-text); border: none;
+            padding: 8px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 700;
+            cursor: pointer; font-family: var(--ui);
         }
 
         header {
-            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            background: linear-gradient(135deg, var(--d-bg), var(--d-bg-2));
             padding: 20px 24px;
-            color: white;
+            color: var(--d-text);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -135,43 +187,44 @@
         .brand { display: flex; align-items: center; gap: 14px; }
         .logo {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            border-radius: 14px;
+            background: linear-gradient(135deg, var(--d-accent), #e5b568);
+            border-radius: var(--r-lg);
             display: flex; align-items: center; justify-content: center;
             font-size: 22px;
-            box-shadow: 0 6px 16px rgba(255,107,53,0.35);
+            box-shadow: 0 6px 16px rgba(217,167,91,0.3);
         }
-        header h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
-        header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
+        header h1 { font-family: var(--display); font-weight: 400; font-size: 21px; }
+        header .whoami { font-size: 12px; color: var(--d-accent); margin-top: 2px; font-family: var(--mono); }
 
         .header-actions { display: flex; gap: 8px; align-items: center; }
         .bell-btn, .log-btn, .lang-btn, .logout-btn {
-            background: rgba(255,255,255,0.1);
+            background: var(--d-hover);
             border: none;
-            color: white;
+            color: var(--d-text);
             padding: 10px 16px;
-            border-radius: 14px;
+            border-radius: var(--r-md);
             font-size: 14px;
             font-weight: 700;
             cursor: pointer;
             display: flex; align-items: center; gap: 8px;
+            font-family: var(--ui);
         }
-        .bell-btn.active { background: #ff6b35; }
+        .bell-btn.active { background: var(--d-accent); color: var(--d-bg); }
         .bell-count {
-            background: #ff6b35;
-            color: white;
+            background: var(--d-accent);
+            color: var(--d-bg);
             width: 22px; height: 22px;
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-size: 12px; font-weight: 800;
         }
-        .bell-btn.active .bell-count { background: rgba(255,255,255,0.3); }
+        .bell-btn.active .bell-count { background: rgba(0,0,0,0.2); color: var(--d-bg); }
 
         .drawer-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.4);
+            background: rgba(20,17,14,0.45);
             z-index: 40;
         }
         .drawer-overlay.open { display: block; }
@@ -181,7 +234,7 @@
             top: 0; right: 0; bottom: 0;
             width: 340px;
             max-width: 88vw;
-            background: linear-gradient(180deg, #1a1a1a, #2d2d2d);
+            background: linear-gradient(180deg, var(--d-bg), var(--d-bg-2));
             box-shadow: -12px 0 32px rgba(0,0,0,0.3);
             z-index: 41;
             transform: translateX(100%);
@@ -195,52 +248,55 @@
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 20px;
         }
-        .drawer-header h2 { color: white; font-size: 20px; font-weight: 800; }
+        .drawer-header h2 { color: var(--d-text); font-family: var(--display); font-weight: 400; font-size: 20px; }
         .drawer-close {
-            color: #999; font-size: 24px; cursor: pointer;
-            background: rgba(255,255,255,0.08);
+            color: var(--d-text-3); font-size: 22px; cursor: pointer;
+            background: var(--d-hover);
             width: 32px; height: 32px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
         }
 
         .notif-empty {
-            padding: 40px 10px; text-align: center; color: #666; font-size: 14px;
+            padding: 40px 10px; text-align: center; color: var(--d-text-3); font-size: 14px;
         }
         .notif-row {
-            background: rgba(255,255,255,0.06);
+            background: var(--d-hover);
             display: flex; align-items: center; justify-content: space-between;
-            padding: 16px; border-radius: 14px; cursor: pointer;
+            padding: 16px; border-radius: var(--r-lg); cursor: pointer;
             margin-bottom: 10px;
             transition: background 0.15s;
         }
-        .notif-row:hover { background: rgba(255,255,255,0.12); }
-        .notif-row .info { color: white; }
-        .notif-row .table-name { font-weight: 800; font-size: 15px; }
-        .notif-row .type { font-size: 12.5px; color: #ff9d70; margin-top: 3px; }
-        .notif-row .go { font-size: 18px; color: #ff6b35; }
+        .notif-row:hover { background: var(--d-hover-2); }
+        .notif-row .info { color: var(--d-text); }
+        .notif-row .table-name { font-weight: 700; font-size: 15px; }
+        .notif-row .type { font-size: 12.5px; color: var(--d-accent); margin-top: 3px; }
+        .notif-row .go { font-size: 18px; color: var(--d-accent); }
 
         .log-row {
-            background: rgba(255,255,255,0.06);
-            padding: 14px 16px; border-radius: 14px;
+            background: var(--d-hover);
+            padding: 14px 16px; border-radius: var(--r-lg);
             margin-bottom: 10px;
         }
-        .log-row .waiter { color: #ff9d70; font-weight: 800; font-size: 13.5px; }
-        .log-row .action { color: white; font-size: 14px; margin-top: 3px; }
-        .log-row .time { color: #888; font-size: 11.5px; margin-top: 4px; }
+        .log-row .waiter { color: var(--d-accent); font-weight: 700; font-size: 13.5px; }
+        .log-row .action { color: var(--d-text); font-size: 14px; margin-top: 3px; }
+        .log-row .time { color: var(--d-text-3); font-size: 11.5px; margin-top: 4px; }
 
         .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
 
         .section-title {
             display: flex; align-items: center; gap: 10px;
-            font-size: 22px; font-weight: 800;
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: 24px;
             margin: 8px 0 18px;
         }
         .section-title .bar {
-            width: 5px; height: 22px; border-radius: 3px;
-            background: #ff6b35;
+            width: 4px; height: 20px; border-radius: 3px;
+            background: var(--accent);
         }
         .section-title .count-badge {
-            background: #eee; color: #666;
+            background: var(--surface-2); color: var(--text-3);
+            font-family: var(--ui);
             font-size: 13px; font-weight: 700;
             padding: 3px 10px; border-radius: 20px;
         }
@@ -252,10 +308,11 @@
         }
 
         .card {
-            background: white;
-            border-radius: 20px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             overflow: hidden;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
             cursor: pointer;
             transition: transform 0.15s;
             position: relative;
@@ -278,81 +335,84 @@
         .card-alert {
             padding: 10px 16px;
             font-size: 12.5px;
-            font-weight: 800;
+            font-weight: 700;
             color: white;
         }
         .card-alert.called { background: #f39c12; }
         .card-alert.pay { background: #7c3aed; }
-        .card-alert.pending { background: #ff6b35; }
+        .card-alert.pending { background: var(--accent); }
         .card-alert.ready { background: #d81b60; }
-        .card-alert.release { background: #999; }
+        .card-alert.release { background: var(--text-4); }
 
-        .card-body { padding: 18px; border-top: 5px solid #eee; }
-        .card.empty .card-body { border-top-color: #1d7d72; }
+        .card-body { padding: 18px; border-top: 4px solid var(--line); }
+        .card.empty .card-body { border-top-color: var(--live); }
         .card.has-alert .card-body { border-top: none; padding-top: 14px; }
 
-        .card h3 { font-size: 19px; font-weight: 800; margin-bottom: 10px; }
+        .card h3 { font-family: var(--ui); font-size: 18px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
         .card-stats { display: flex; flex-wrap: wrap; gap: 8px; }
         .stat {
             font-size: 13px; font-weight: 700;
-            background: #f7f5f2; color: #555;
-            padding: 6px 12px; border-radius: 10px;
+            background: var(--surface-2); color: var(--text-3);
+            padding: 6px 12px; border-radius: var(--r-md);
             display: flex; align-items: center; gap: 5px;
         }
-        .stat.paid { background: #e6f5f3; color: #1d7d72; }
-        .stat.unpaid { background: #fce8e6; color: #c0392b; }
-        .stat.empty-stat { background: #e6f5f3; color: #1d7d72; }
-        .stat.occupied-stat { background: #e6f0fc; color: #1d5fd7; }
+        .stat.paid { background: var(--live-soft); color: var(--live); }
+        .stat.unpaid { background: var(--warn-soft); color: var(--warn); }
+        .stat.empty-stat { background: var(--live-soft); color: var(--live); }
+        .stat.occupied-stat { background: var(--accent-soft); color: var(--accent); }
 
         .overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.55);
+            background: rgba(20,17,14,0.5);
             align-items: center;
             justify-content: center;
             z-index: 20;
         }
         .modal {
-            background: white;
-            border-radius: 24px;
+            background: var(--surface);
+            border-radius: var(--r-sheet);
             padding: 28px;
             width: 92%;
             max-width: 520px;
             max-height: 85vh;
             overflow-y: auto;
             position: relative;
+            box-shadow: var(--card-shadow);
         }
-        .modal h2 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+        .modal h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin-bottom: 6px; color: var(--text); }
         .modal input {
             padding: 12px 14px;
-            border: 1.5px solid #eee;
-            border-radius: 12px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             margin-top: 10px;
             margin-right: 8px;
             font-size: 14px;
             width: 100%;
             max-width: 220px;
+            font-family: var(--ui);
         }
         button {
-            background: #1a1a1a;
-            color: white;
+            background: var(--text);
+            color: var(--on-accent);
             border: none;
             padding: 12px 18px;
-            border-radius: 12px;
+            border-radius: var(--r-md);
             cursor: pointer;
             font-size: 14px;
             font-weight: 700;
             transition: transform 0.1s;
+            font-family: var(--ui);
         }
         button:active { transform: scale(0.96); }
-        button.danger { background: #e74c3c; }
-        button.success { background: #1d7d72; }
-        button.secondary { background: #f0f0f0; color: #555; }
-        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); }
+        button.danger { background: var(--warn); }
+        button.success { background: var(--live); }
+        button.secondary { background: var(--surface-2); color: var(--text-2); }
+        button.primary { background: var(--accent); }
 
         .order-line {
-            border-bottom: 1px solid #f2f2f2;
+            border-bottom: 1px solid var(--line);
             padding: 14px 0;
             display: flex;
             justify-content: space-between;
@@ -367,6 +427,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            color: var(--text);
         }
         .order-line .actions {
             display: flex;
@@ -383,22 +444,22 @@
         .action-row { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
         .close-modal {
             position: absolute; top: 24px; right: 24px;
-            cursor: pointer; font-size: 24px; color: #bbb;
+            cursor: pointer; font-size: 24px; color: var(--text-4);
         }
-        #modalResult { margin-top: 14px; font-size: 13px; font-weight: 600; color: #555; }
+        #modalResult { margin-top: 14px; font-size: 13px; font-weight: 600; color: var(--text-3); }
 
         .move-target-btn {
             width: 100%;
             text-align: left;
-            background: #f7f5f2;
-            color: #1a1a1a;
+            background: var(--surface-2);
+            color: var(--text);
             margin-bottom: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .move-target-btn:hover { background: #ffe4cc; }
-        .move-empty-msg { color: #999; font-size: 14px; padding: 10px 0; }
+        .move-target-btn:hover { background: var(--accent-soft); }
+        .move-empty-msg { color: var(--text-4); font-size: 14px; padding: 10px 0; }
     </style>
 </head>
 <body>
@@ -1162,7 +1223,7 @@
             content.innerHTML = `
                 <h2>${t("move_title", fromLabel)}</h2>
                 <div style="margin-top:16px;">${listHtml}</div>
-                <p id="moveModalResult" style="margin-top:10px; font-size:13px; font-weight:600; color:#c0392b;"></p>
+                <p id="moveModalResult" style="margin-top:10px; font-size:13px; font-weight:600; color:var(--warn);"></p>
             `;
         }
 
@@ -1206,12 +1267,12 @@
                     const table = tables.find(t => t.table_id === tableId);
                     const label = table ? (table.display_label || table.table_id) : tableId;
                     const safeLabel = escapeHtml(label);
-                    const renameIcon = `<span onclick="renameTable('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:#ff6b35; margin-left:8px;">✏️</span>`;
+                    const renameIcon = `<span onclick="renameTable('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:var(--accent); margin-left:8px;">✏️</span>`;
 
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
                             <h2>${safeLabel}${renameIcon}</h2>
-                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">${t("table_empty_msg")}</p>
+                            <p style="color:var(--live); font-weight:600; margin:12px 0;">${t("table_empty_msg")}</p>
                             <div style="margin-top:12px;">
                                 <button class="success" onclick="openSessionForCurrentTable()">${t("open_session")}</button>
                             </div>
@@ -1226,7 +1287,7 @@
                             if (session.error || session.status !== "OPEN") {
                                 content.innerHTML = `
                                     <h2>${safeLabel}${renameIcon}</h2>
-                                    <p style="color:#777; font-weight:600; margin:12px 0;">${t("session_ended_msg", session.status || "unknown")}</p>
+                                    <p style="color:var(--text-3); font-weight:600; margin:12px 0;">${t("session_ended_msg", session.status || "unknown")}</p>
                                     <button class="secondary" onclick="releaseTable('${tableId}')">${t("release_table")}</button>
                                     <p id="modalResult"></p>
                                 `;
@@ -1258,7 +1319,7 @@
                                             } else if (o.status === "APPROVED" && o.ready) {
                                                 actionsHtml = `<button class="success" onclick="pickedUp('${o.order_id}')">${t("picked_up")}</button>`;
                                             } else {
-                                                actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
+                                                actionsHtml = `<span style="font-size:12px;color:var(--text-4);">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
                                             }
 
                                             const readyTag = (o.status === "APPROVED" && o.ready)
@@ -1270,14 +1331,14 @@
                                                 <div class="info">
                                                     ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
                                                     ${readyTag}
-                                                    ${extrasList ? `<div style="font-size:11.5px; color:#1d5fd7; margin-top:2px; white-space:normal;">+ ${extrasList}</div>` : ""}
-                                                    ${o.note ? `<div style="font-size:14px; color:#e74c3c; font-weight:700; font-style:italic; margin-top:4px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                                    ${extrasList ? `<div style="font-size:11.5px; color:var(--accent); margin-top:2px; white-space:normal;">+ ${extrasList}</div>` : ""}
+                                                    ${o.note ? `<div style="font-size:14px; color:var(--warn); font-weight:700; font-style:italic; margin-top:4px; white-space:normal;">💬 ${escapeHtml(o.note)}</div>` : ""}
                                                 </div>
                                                 <div class="actions">${actionsHtml}</div>
                                             </div>
                                         `;
                                         }).join("")
-                                        : `<p style='color:#999; padding:10px 0;'>${t("no_orders")}</p>`;
+                                        : `<p style='color:var(--text-4); padding:10px 0;'>${t("no_orders")}</p>`;
 
                                     let alerts = "";
                                     if (session.waiter_called) {
@@ -1302,15 +1363,15 @@
 
                                     content.innerHTML = `
                                         <h2>${safeLabel}${renameIcon}</h2>
-                                        <p style="color:#777; margin:6px 0 12px;">
+                                        <p style="color:var(--text-3); margin:6px 0 12px;">
                                             ${t("people", session.party_size)}
-                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:#ff6b35; font-weight:700; margin-left:6px;">${t("edit_party_size")}</span>
+                                            <span onclick="editPartySize('${session.session_id}', ${session.party_size})" style="cursor:pointer; color:var(--accent); font-weight:700; margin-left:6px;">${t("edit_party_size")}</span>
                                             &nbsp;|&nbsp; ${modalStatusStat.label}
                                         </p>
-                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", displayAmount.toFixed(2))}</p>
-                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:#ff6b35; font-weight:700;">${t("customer_link")}</a></p>
+                                        <p style="font-family: var(--display); font-size:22px; font-weight:400; color:var(--accent); margin:10px 0;">${t("bill_so_far", displayAmount.toFixed(2))}</p>
+                                        <p style="font-size:13px;"><a href="customer.html?table=${tableId}" target="_blank" style="color:var(--accent); font-weight:700;">${t("customer_link")}</a></p>
                                         ${alerts}
-                                        <h3 style="font-size:16px; margin:20px 0 10px;">${t("orders_heading")}</h3>
+                                        <h3 style="font-size:15px; margin:20px 0 10px; color:var(--text);">${t("orders_heading")}</h3>
                                         ${ordersHtml}
                                         <div class="bulk-actions" style="margin-top:12px;">${bulkButtons}</div>
                                         <div class="action-row">
