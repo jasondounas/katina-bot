@@ -5,26 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Commissioner:wght@300..700&family=GFS+Didot&display=swap');
+
+        :root {
+            --screen: #f7f6f2;
+            --surface: #fdfcfa;
+            --surface-2: #f1efe9;
+            --text: #1a1714;
+            --text-2: #453d33;
+            --text-3: #6e6558;
+            --text-4: #8a8071;
+            --accent: #8f6210;
+            --accent-hover: #7a5309;
+            --on-accent: #ffffff;
+            --accent-soft: rgba(143, 98, 16, 0.10);
+            --accent-line: rgba(143, 98, 16, 0.34);
+            --live: #1f6f63;
+            --live-soft: rgba(31, 111, 99, 0.11);
+            --warn: #9e3f1f;
+            --warn-soft: rgba(158, 63, 31, 0.10);
+            --warn-line: rgba(158, 63, 31, 0.32);
+            --line: rgba(26, 23, 20, 0.13);
+            --line-mid: rgba(26, 23, 20, 0.16);
+            --hover: rgba(26, 23, 20, 0.04);
+            --card-shadow: 0 1px 2px rgba(26, 23, 20, 0.04), 0 8px 22px rgba(26, 23, 20, 0.06);
+
+            --d-bg: #221e19;
+            --d-bg-2: #2d2620;
+            --d-text: #f6f3ed;
+            --d-text-3: #9c9082;
+            --d-text-4: rgba(246, 243, 237, 0.55);
+            --d-accent: #d9a75b;
+            --d-hover: rgba(239, 233, 224, 0.07);
+
+            --display: 'GFS Didot', 'Didot', 'Iowan Old Style', Georgia, serif;
+            --ui: 'Commissioner', 'Helvetica Neue', Arial, sans-serif;
+            --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+            --r-sm: 6px;
+            --r-md: 10px;
+            --r-lg: 14px;
+            --r-sheet: 22px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            background: #f7f5f2;
-            color: #1a1a1a;
+            font-family: var(--ui);
+            background: var(--screen);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
         }
 
         .spinner {
             width: 22px; height: 22px;
-            border: 3px solid rgba(0,0,0,0.1);
-            border-top-color: #ff6b35;
+            border: 3px solid rgba(26,23,20,0.1);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             display: inline-block;
         }
-        .spinner.light { border-color: rgba(255,255,255,0.25); border-top-color: white; }
+        .spinner.light { border-color: rgba(246,243,237,0.25); border-top-color: var(--d-text); }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-block {
             display: flex; flex-direction: column; align-items: center; gap: 14px;
-            padding: 60px 20px; color: #999; font-size: 14px;
+            padding: 60px 20px; color: var(--text-4); font-size: 14px;
             grid-column: 1 / -1;
         }
 
@@ -46,8 +90,8 @@
         }
         .add-form textarea {
             padding: 10px 12px;
-            border: 1.5px solid #eee;
-            border-radius: 10px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 14px;
             width: 220px;
             min-height: 40px;
@@ -56,68 +100,71 @@
             width: 100%;
             padding: 10px 12px;
             margin-bottom: 10px;
-            border: 1.5px solid #eee;
-            border-radius: 10px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 14px;
             min-height: 40px;
         }
 
         .login-screen {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            background: linear-gradient(135deg, var(--d-bg), var(--d-bg-2));
             display: flex; align-items: center; justify-content: center;
             z-index: 100;
         }
         .login-box {
-            background: white;
-            border-radius: 24px;
+            background: var(--surface);
+            border-radius: var(--r-sheet);
             padding: 36px;
             width: 90%;
             max-width: 380px;
             text-align: center;
+            box-shadow: var(--card-shadow);
         }
         .login-box .logo {
             width: 60px; height: 60px;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            border-radius: 18px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            border-radius: var(--r-lg);
             display: flex; align-items: center; justify-content: center;
             font-size: 28px;
             margin: 0 auto 20px;
         }
-        .login-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
-        .login-box p { color: #777; font-size: 14px; margin-bottom: 20px; }
+        .login-box h2 { font-family: var(--display); font-weight: 400; font-size: 24px; margin-bottom: 8px; }
+        .login-box p { color: var(--text-3); font-size: 14px; margin-bottom: 20px; }
         .login-box input {
             width: 100%;
             padding: 14px;
-            border: 1.5px solid #eee;
-            border-radius: 12px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 16px;
             text-align: center;
             margin-bottom: 12px;
+            font-family: var(--ui);
         }
         .login-box button {
             width: 100%;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            color: white;
+            background: var(--accent);
+            color: var(--on-accent);
             border: none;
             padding: 14px;
-            border-radius: 12px;
+            border-radius: var(--r-md);
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
+            font-family: var(--ui);
         }
-        .login-error { color: #e74c3c; font-size: 13px; margin-top: 10px; min-height: 18px; }
+        .login-error { color: var(--warn); font-size: 13px; margin-top: 10px; min-height: 18px; }
         .login-lang-toggle {
             position: absolute; top: 20px; right: 20px;
-            background: rgba(255,255,255,0.1); color: white; border: none;
-            padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700;
-            cursor: pointer;
+            background: var(--d-hover); color: var(--d-text); border: none;
+            padding: 8px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 700;
+            cursor: pointer; font-family: var(--ui);
         }
 
         header {
-            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            background: linear-gradient(135deg, var(--d-bg), var(--d-bg-2));
             padding: 20px 24px;
-            color: white;
+            color: var(--d-text);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -125,23 +172,24 @@
         .brand { display: flex; align-items: center; gap: 14px; }
         .logo {
             width: 44px; height: 44px;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
-            border-radius: 14px;
+            background: linear-gradient(135deg, var(--d-accent), #e5b568);
+            border-radius: var(--r-lg);
             display: flex; align-items: center; justify-content: center;
             font-size: 22px;
-            box-shadow: 0 6px 16px rgba(255,107,53,0.35);
+            box-shadow: 0 6px 16px rgba(217,167,91,0.3);
         }
-        header h1 { font-size: 20px; font-weight: 800; }
-        header .whoami { font-size: 12px; color: #ffb088; margin-top: 2px; }
+        header h1 { font-family: var(--display); font-weight: 400; font-size: 21px; }
+        header .whoami { font-size: 12px; color: var(--d-accent); margin-top: 2px; font-family: var(--mono); }
         .lang-btn {
-            background: rgba(255,255,255,0.1);
+            background: var(--d-hover);
             border: none;
-            color: white;
+            color: var(--d-text);
             padding: 10px 16px;
-            border-radius: 14px;
+            border-radius: var(--r-md);
             font-size: 14px;
             font-weight: 700;
             cursor: pointer;
+            font-family: var(--ui);
         }
 
         .container { padding: 24px; max-width: 900px; margin: 0 auto; }
@@ -153,17 +201,17 @@
             display: inline-flex;
             align-items: center;
             gap: 7px;
-            background: white;
+            background: var(--surface);
             border-radius: 20px;
             padding: 7px 16px;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+            box-shadow: var(--card-shadow);
             font-size: 13px;
             font-weight: 700;
-            color: #ff6b35;
+            color: var(--accent);
             margin-bottom: 20px;
         }
         .mini-stat-bar .mini-icon { font-size: 14px; }
-        .mini-stat-bar .mini-label { color: #999; font-weight: 600; font-size: 11.5px; }
+        .mini-stat-bar .mini-label { color: var(--text-4); font-weight: 600; font-size: 11.5px; }
 
         .stats-row {
             display: grid;
@@ -172,58 +220,64 @@
             margin-bottom: 32px;
         }
         .stat-card {
-            background: white;
-            border-radius: 18px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 18px;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
         }
-        .stat-card .num { font-size: 28px; font-weight: 800; color: #ff6b35; }
-        .stat-card .label { font-size: 13px; color: #777; margin-top: 4px; font-weight: 600; }
-        .stat-card.money { background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
-        .stat-card.money .num, .stat-card.money .label { color: white; }
-        .stat-card.money-outstanding { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        .stat-card .num { font-size: 27px; font-weight: 700; color: var(--accent); font-family: var(--ui); }
+        .stat-card .label { font-size: 13px; color: var(--text-3); margin-top: 4px; font-weight: 600; }
+        .stat-card.money { background: linear-gradient(135deg, var(--d-bg), var(--d-bg-2)); border: none; }
+        .stat-card.money .num, .stat-card.money .label { color: var(--d-text); }
+        .stat-card.money .num { color: var(--d-accent); }
+        .stat-card.money-outstanding { background: linear-gradient(135deg, var(--warn), #7c3018); border: none; }
         .stat-card.money-outstanding .num, .stat-card.money-outstanding .label { color: white; }
-        .stat-card.occupied-card { background: linear-gradient(135deg, #4a90e2, #1d5fd7); }
+        .stat-card.occupied-card { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border: none; }
         .stat-card.occupied-card .num, .stat-card.occupied-card .label { color: white; }
-        .stat-card.unpaid-card { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .stat-card.unpaid-card { background: linear-gradient(135deg, var(--warn), #7c3018); border: none; }
         .stat-card.unpaid-card .num, .stat-card.unpaid-card .label { color: white; }
 
         .section-title {
             display: flex; align-items: center; justify-content: space-between;
-            font-size: 22px; font-weight: 800;
+            font-family: var(--display);
+            font-weight: 400;
+            font-size: 24px;
             margin: 8px 0 18px;
         }
         .section-title .bar {
-            width: 5px; height: 22px; border-radius: 3px;
-            background: #ff6b35;
+            width: 4px; height: 20px; border-radius: 3px;
+            background: var(--accent);
             display: inline-block;
             margin-right: 10px;
         }
 
         .category-heading {
-            font-size: 15px;
-            font-weight: 800;
-            color: #7c3aed;
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent);
             margin: 20px 0 10px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.12em;
         }
         .category-heading:first-child { margin-top: 0; }
 
         .collapsible-header {
             cursor: pointer;
             user-select: none;
-            background: white;
+            background: var(--surface);
+            border: 1px solid var(--line);
             padding: 14px 18px;
-            border-radius: 16px;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+            border-radius: var(--r-lg);
+            box-shadow: var(--card-shadow);
             margin-bottom: 10px;
         }
         .collapsible-header .bar { margin-right: 10px; }
         .collapsible-header .chevron {
             transition: transform 0.2s;
             font-size: 14px;
-            color: #999;
+            color: var(--text-4);
         }
         .collapsible-header.open .chevron {
             transform: rotate(180deg);
@@ -236,122 +290,130 @@
         }
 
         button {
-            background: #1a1a1a;
-            color: white;
+            background: var(--text);
+            color: var(--on-accent);
             border: none;
             padding: 10px 16px;
-            border-radius: 10px;
+            border-radius: var(--r-md);
             cursor: pointer;
             font-size: 13px;
             font-weight: 700;
+            font-family: var(--ui);
         }
-        button.danger { background: #e74c3c; }
-        button.success { background: #1d7d72; }
-        button.primary { background: linear-gradient(135deg, #ff6b35, #f7931e); display: flex; align-items: center; gap: 8px; }
-        button.secondary { background: #f0f0f0; color: #555; }
+        button.danger { background: var(--warn); }
+        button.success { background: var(--live); }
+        button.primary { background: var(--accent); display: flex; align-items: center; gap: 8px; }
+        button.secondary { background: var(--surface-2); color: var(--text-2); }
 
         select {
             padding: 10px 12px;
-            border: 1.5px solid #eee;
-            border-radius: 10px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 14px;
-            background: white;
+            background: var(--surface);
+            font-family: var(--ui);
         }
         .edit-modal select { width: 100%; margin-bottom: 10px; }
 
         .alert-empty {
-            background: white; border-radius: 16px; padding: 24px;
-            text-align: center; color: #999; font-size: 14px;
+            background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px;
+            text-align: center; color: var(--text-4); font-size: 14px;
             margin-bottom: 32px;
         }
         .alert-row {
-            background: white;
-            border-left: 5px solid #ff6b35;
-            border-radius: 14px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--accent);
+            border-radius: var(--r-lg);
             padding: 14px 18px;
             margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+            box-shadow: var(--card-shadow);
         }
         .alert-row.called { border-left-color: #f39c12; }
         .alert-row.pay { border-left-color: #7c3aed; }
-        .alert-row.stock { border-left-color: #c0392b; }
-        .alert-row .table-name { font-weight: 800; font-size: 15px; }
-        .alert-row .type { font-size: 13px; color: #777; margin-top: 2px; }
+        .alert-row.stock { border-left-color: var(--warn); }
+        .alert-row .table-name { font-weight: 700; font-size: 15px; color: var(--text); }
+        .alert-row .type { font-size: 13px; color: var(--text-3); margin-top: 2px; }
 
         .activity-row {
-            background: white;
-            border-radius: 14px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 14px 18px;
             margin-bottom: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+            box-shadow: var(--card-shadow);
         }
-        .activity-row .waiter { color: #ff6b35; font-weight: 800; font-size: 13.5px; }
-        .activity-row .action { font-size: 14px; margin-top: 3px; }
-        .activity-row .time { color: #aaa; font-size: 11.5px; margin-top: 3px; }
+        .activity-row .waiter { color: var(--accent); font-weight: 700; font-size: 13.5px; }
+        .activity-row .action { font-size: 14px; margin-top: 3px; color: var(--text); }
+        .activity-row .time { color: var(--text-4); font-size: 11.5px; margin-top: 3px; }
 
         .table-row {
-            background: white;
-            border-radius: 16px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 16px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+            box-shadow: var(--card-shadow);
         }
         .table-row.clickable { cursor: pointer; }
-        .table-row.clickable:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-        .table-row .info .name { font-weight: 700; font-size: 15px; }
+        .table-row.clickable:hover { border-color: var(--line-mid); }
+        .table-row .info .name { font-weight: 700; font-size: 15px; color: var(--text); }
         .table-row .info .status { font-size: 12.5px; margin-top: 2px; font-weight: 600; }
-        .table-row .info .status.occupied { color: #c0392b; }
-        .table-row .info .status.empty { color: #1d7d72; }
+        .table-row .info .status.occupied { color: var(--warn); }
+        .table-row .info .status.empty { color: var(--live); }
         .table-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .menu-item-row {
-            background: white;
-            border-radius: 16px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 16px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+            box-shadow: var(--card-shadow);
         }
         .menu-item-row.unavailable { opacity: 0.5; }
-        .menu-item-row.out-of-stock { border: 1.5px solid #e74c3c; }
+        .menu-item-row.out-of-stock { border: 1.5px solid var(--warn); }
         .item-thumb {
             width: 54px; height: 54px;
-            border-radius: 12px;
+            border-radius: var(--r-md);
             object-fit: cover;
-            background: #f0f0f0;
+            background: var(--surface-2);
             flex-shrink: 0;
         }
         .item-info { flex: 1; min-width: 0; }
-        .item-info .name { font-weight: 700; font-size: 15px; }
-        .item-info .price { color: #ff6b35; font-weight: 700; font-size: 13px; margin-top: 2px; }
-        .item-info .desc { font-size: 12px; color: #999; margin-top: 2px; }
-        .item-info .extras-summary { font-size: 11.5px; color: #7c3aed; margin-top: 3px; }
+        .item-info .name { font-weight: 700; font-size: 15px; color: var(--text); }
+        .item-info .price { color: var(--accent); font-weight: 700; font-size: 13px; margin-top: 2px; }
+        .item-info .desc { font-size: 12px; color: var(--text-4); margin-top: 2px; }
+        .item-info .extras-summary { font-size: 11.5px; color: var(--accent); margin-top: 3px; }
         .item-info .stock-summary { font-size: 11.5px; font-weight: 700; margin-top: 3px; }
-        .item-info .stock-summary.ok { color: #1d7d72; }
-        .item-info .stock-summary.low { color: #e74c3c; }
+        .item-info .stock-summary.ok { color: var(--live); }
+        .item-info .stock-summary.low { color: var(--warn); }
         .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .add-form {
-            background: white;
-            border-radius: 18px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 20px;
             margin-bottom: 24px;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
         }
         .add-form input {
             padding: 10px 12px;
-            border: 1.5px solid #eee;
-            border-radius: 10px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-md);
             font-size: 14px;
+            font-family: var(--ui);
         }
         #itemId, #itemName { width: 140px; }
         #itemPrice { width: 90px; }
@@ -365,20 +427,20 @@
             margin: 10px 0;
         }
         .image-source-toggle button {
-            background: #f0f0f0;
-            color: #555;
+            background: var(--surface-2);
+            color: var(--text-2);
             font-size: 12px;
             padding: 8px 14px;
         }
         .image-source-toggle button.active {
-            background: #1a1a1a;
-            color: white;
+            background: var(--text);
+            color: var(--on-accent);
         }
         .image-preview {
             width: 80px; height: 80px;
-            border-radius: 12px;
+            border-radius: var(--r-md);
             object-fit: cover;
-            background: #f0f0f0;
+            background: var(--surface-2);
             margin-top: 8px;
             display: none;
         }
@@ -386,11 +448,11 @@
         .extras-section {
             margin-top: 14px;
             padding-top: 14px;
-            border-top: 1px solid #f0f0f0;
+            border-top: 1px solid var(--line);
         }
         .extras-label {
             font-size: 12px;
-            color: #777;
+            color: var(--text-3);
             font-weight: 700;
             margin-bottom: 8px;
             display: block;
@@ -404,26 +466,28 @@
         .extra-row .extra-name {
             flex: 1;
             padding: 8px 10px;
-            border: 1.5px solid #eee;
-            border-radius: 8px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-sm);
             font-size: 13px;
+            font-family: var(--ui);
         }
         .extra-row .extra-price {
             width: 80px;
             padding: 8px 10px;
-            border: 1.5px solid #eee;
-            border-radius: 8px;
+            border: 1.5px solid var(--line);
+            border-radius: var(--r-sm);
             font-size: 13px;
+            font-family: var(--ui);
         }
         .extra-row button {
-            background: #fce8e6;
-            color: #c0392b;
+            background: var(--warn-soft);
+            color: var(--warn);
             padding: 8px 10px;
             font-size: 13px;
         }
         .add-extra-btn {
-            background: #f0f0f0;
-            color: #555;
+            background: var(--surface-2);
+            color: var(--text-2);
             font-size: 12px;
             padding: 8px 14px;
         }
@@ -431,30 +495,32 @@
         .modal-overlay {
             display: none;
             position: fixed; top:0; left:0; right:0; bottom:0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(20,17,14,0.5);
             align-items: center; justify-content: center;
             z-index: 50;
         }
         .edit-modal {
-            background: white; border-radius: 20px; padding: 24px;
+            background: var(--surface); border-radius: var(--r-sheet); padding: 24px;
             width: 90%; max-width: 420px;
             max-height: 85vh;
             overflow-y: auto;
+            box-shadow: var(--card-shadow);
         }
-        .edit-modal h3 { margin-bottom: 14px; }
+        .edit-modal h3 { font-family: var(--display); font-weight: 400; font-size: 22px; margin-bottom: 14px; color: var(--text); }
         .edit-modal input {
             width: 100%; padding: 10px 12px; margin-bottom: 10px;
-            border: 1.5px solid #eee; border-radius: 10px; font-size: 14px;
+            border: 1.5px solid var(--line); border-radius: var(--r-md); font-size: 14px;
+            font-family: var(--ui);
         }
-        .edit-modal label { font-size: 12px; color: #777; font-weight: 700; display:block; margin-bottom:4px; }
-        .stock-hint { font-size: 11.5px; color: #999; margin: -6px 0 10px; }
+        .edit-modal label { font-size: 12px; color: var(--text-3); font-weight: 700; display:block; margin-bottom:4px; }
+        .stock-hint { font-size: 11.5px; color: var(--text-4); margin: -6px 0 10px; }
         .kitchen-checkbox-row {
             display: flex;
             align-items: center;
             gap: 8px;
             margin: 10px 0 14px;
             font-size: 13px;
-            color: #555;
+            color: var(--text-3);
             font-weight: 600;
         }
         .kitchen-checkbox-row input { width: auto; margin: 0; }
@@ -462,12 +528,12 @@
             font-size: 11px;
             font-weight: 700;
             padding: 2px 8px;
-            border-radius: 8px;
+            border-radius: var(--r-sm);
             margin-left: 6px;
             display: inline-block;
         }
-        .kitchen-badge.assigned { background: #e6f0fc; color: #1d5fd7; }
-        .kitchen-badge.out { background: #fce8e6; color: #c0392b; }
+        .kitchen-badge.assigned { background: var(--accent-soft); color: var(--accent); }
+        .kitchen-badge.out { background: var(--warn-soft); color: var(--warn); }
 
         .period-toggle {
             display: flex;
@@ -476,14 +542,14 @@
             flex-wrap: wrap;
         }
         .period-toggle button {
-            background: #f0f0f0;
-            color: #555;
+            background: var(--surface-2);
+            color: var(--text-2);
             font-size: 13px;
             padding: 10px 18px;
         }
         .period-toggle button.active {
-            background: #1a1a1a;
-            color: white;
+            background: var(--text);
+            color: var(--on-accent);
         }
         .waiter-filter-row {
             display: flex;
@@ -494,7 +560,7 @@
         .waiter-filter-row label {
             font-size: 13px;
             font-weight: 700;
-            color: #555;
+            color: var(--text-2);
         }
         .waiter-filter-row select {
             flex: 1;
@@ -507,41 +573,44 @@
             margin-bottom: 20px;
         }
         .chart-card {
-            background: white;
-            border-radius: 18px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--r-lg);
             padding: 20px;
             margin-bottom: 18px;
-            box-shadow: 0 3px 14px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
         }
         .chart-card h4 {
+            font-family: var(--ui);
             font-size: 15px;
-            font-weight: 800;
+            font-weight: 700;
             margin-bottom: 14px;
-            color: #333;
+            color: var(--text-2);
         }
         .chart-wrap {
             position: relative;
             height: 260px;
         }
         .chart-empty {
-            color: #999;
+            color: var(--text-4);
             font-size: 14px;
             text-align: center;
             padding: 40px 0;
         }
 
         .orders-modal {
-            background: white; border-radius: 24px; padding: 28px;
+            background: var(--surface); border-radius: var(--r-sheet); padding: 28px;
             width: 92%; max-width: 520px; max-height: 85vh;
             overflow-y: auto; position: relative;
+            box-shadow: var(--card-shadow);
         }
-        .orders-modal h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+        .orders-modal h2 { font-family: var(--display); font-weight: 400; font-size: 24px; margin-bottom: 6px; color: var(--text); }
         .orders-close {
             position: absolute; top: 24px; right: 24px;
-            cursor: pointer; font-size: 24px; color: #bbb;
+            cursor: pointer; font-size: 24px; color: var(--text-4);
         }
         .order-line {
-            border-bottom: 1px solid #f2f2f2;
+            border-bottom: 1px solid var(--line);
             padding: 14px 0;
             display: flex;
             justify-content: space-between;
@@ -550,13 +619,14 @@
         }
         .order-line .info {
             font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
+            color: var(--text);
         }
         .order-line .actions { flex-shrink: 0; }
         .order-line .actions button { font-size: 12px; padding: 8px 12px; }
 
         .mode-desc {
             font-size: 12px;
-            color: #999;
+            color: var(--text-4);
             margin-top: 8px;
         }
     </style>
@@ -604,7 +674,7 @@
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="settingsTitle">Settings</span></span></div>
         <div class="add-form">
-            <label id="tableStatusModeLabel" style="font-size:13px; font-weight:700; color:#555; display:block; margin-bottom:10px;">Table Status Display</label>
+            <label id="tableStatusModeLabel" style="font-size:13px; font-weight:700; color:var(--text-2); display:block; margin-bottom:10px;">Table Status Display</label>
             <div class="period-toggle">
                 <button id="modeSimpleBtn" onclick="setTableStatusMode('simple')">Simple</button>
                 <button id="modeDetailedBtn" onclick="setTableStatusMode('detailed')">Detailed</button>
@@ -648,7 +718,7 @@
         </div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="tablesTitle">Tables</span></span></div>
-        <p style="color:#999; font-size:13px; margin:-12px 0 16px;" id="tablesHint">Tap an occupied table to view and manage its orders.</p>
+        <p style="color:var(--text-4); font-size:13px; margin:-12px 0 16px;" id="tablesHint">Tap an occupied table to view and manage its orders.</p>
 
         <div class="add-form">
             <div class="form-row">
@@ -656,7 +726,7 @@
                 <input type="text" id="newTableLabel" placeholder="display name (optional)">
             </div>
             <button class="primary" id="addTableBtn" onclick="addTable()" style="margin-top:10px;">+ Register Table</button>
-            <p id="addTableResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+            <p id="addTableResult" style="margin-top:8px; font-size:13px; color:var(--text-3);"></p>
         </div>
 
         <div id="tablesList"><div class="loading-block"><div class="spinner"></div></div></div>
@@ -668,7 +738,7 @@
         <div class="collapsible-body" id="activityList"></div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="kitchenLinksTitle">Kitchen Station Links</span></span></div>
-        <p style="color:#999; font-size:13px; margin:-12px 0 16px;" id="kitchenLinksHint">Give each station tablet the link matching its station.</p>
+        <p style="color:var(--text-4); font-size:13px; margin:-12px 0 16px;" id="kitchenLinksHint">Give each station tablet the link matching its station.</p>
         <div id="kitchenLinksList" style="margin-bottom:32px;"></div>
 
         <div class="section-title" style="margin-top:32px;"><span><span class="bar"></span><span id="menuItemsTitle">Menu Items</span></span></div>
@@ -693,7 +763,7 @@
             <img class="image-preview" id="addImagePreview">
 
             <div style="margin-top:12px;">
-                <label id="itemKitchenStationLabel" style="font-size:12px; color:#777; font-weight:700; display:block; margin-bottom:4px;">Kitchen station (optional)</label>
+                <label id="itemKitchenStationLabel" style="font-size:12px; color:var(--text-3); font-weight:700; display:block; margin-bottom:4px;">Kitchen station (optional)</label>
                 <input type="text" id="itemKitchenStation" list="stationSuggestions" placeholder="e.g. Salads, Grill, Bar" style="width:220px;">
             </div>
 
@@ -710,7 +780,7 @@
 
             <br>
             <button class="primary" id="addItemBtn" onclick="addItem()" style="margin-top:10px;">+ Add Item</button>
-            <p id="addResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+            <p id="addResult" style="margin-top:8px; font-size:13px; color:var(--text-3);"></p>
         </div>
 
         <div id="menuItemsList"><div class="loading-block"><div class="spinner"></div></div></div>
@@ -760,7 +830,7 @@
                 <button class="primary" id="saveEditBtn" onclick="saveEdit()">Save</button>
                 <button class="secondary" onclick="closeEdit()" id="cancelEditBtn">Cancel</button>
             </div>
-            <p id="editResult" style="margin-top:8px; font-size:13px; color:#555;"></p>
+            <p id="editResult" style="margin-top:8px; font-size:13px; color:var(--text-3);"></p>
         </div>
     </div>
 
@@ -1196,67 +1266,6 @@
             return T[currentLang].action_labels[action] || action;
         }
 
-        function getKnownStations() {
-            const items = window._menuItemsCache || [];
-            const stations = items
-                .map(i => (i.kitchen_station || "").trim())
-                .filter(Boolean);
-            return [...new Set(stations)];
-        }
-
-        function populateStationSuggestions() {
-            const datalist = document.getElementById("stationSuggestions");
-            if (!datalist) return;
-            const stations = getKnownStations();
-            datalist.innerHTML = stations.map(s => `<option value="${escapeHtml(s)}">`).join("");
-        }
-
-        function renderKitchenStationLinks() {
-            const kitchenBase = "https://katina-bot-2.onrender.com/kitchen.html";
-            const stations = getKnownStations();
-            const list = document.getElementById("kitchenLinksList");
-            if (!list) return;
-
-            let html = `
-                <div class="table-row">
-                    <div class="info"><div class="name">${t("all_stations_label")}</div></div>
-                    <div class="actions">
-                        <input type="text" readonly value="${kitchenBase}" style="width:200px; font-size:12px; padding:8px;" onclick="this.select()">
-                        <button class="secondary" onclick="copyStationLink('${kitchenBase}', this)">${t("copy_label")}</button>
-                    </div>
-                </div>
-            `;
-
-            if (!stations.length) {
-                html += `<p style="color:#999; font-size:13px; margin-top:10px;">${t("no_stations_msg")}</p>`;
-                list.innerHTML = html;
-                return;
-            }
-
-            stations.forEach(station => {
-                const url = `${kitchenBase}?station=${encodeURIComponent(station)}`;
-                html += `
-                    <div class="table-row">
-                        <div class="info"><div class="name">👨‍🍳 ${escapeHtml(station)}</div></div>
-                        <div class="actions">
-                            <input type="text" readonly value="${url}" style="width:220px; font-size:12px; padding:8px;" onclick="this.select()">
-                            <button class="secondary" onclick="copyStationLink('${url}', this)">${t("copy_label")}</button>
-                        </div>
-                    </div>
-                `;
-            });
-
-            list.innerHTML = html;
-        }
-
-        function copyStationLink(url, btn) {
-            navigator.clipboard.writeText(url).then(() => {
-                const original = btn.innerText;
-                btn.innerText = t("copied_label");
-                setTimeout(() => { btn.innerText = original; }, 1500);
-            });
-        }
-
         function getToken() { return localStorage.getItem("waiterToken"); }
         function getWaiterName() { return localStorage.getItem("waiterName") || "Unknown"; }
 
@@ -1688,12 +1697,12 @@
                     datasets: [{
                         label: t("revenue_axis"),
                         data: trend.map(r => r.revenue),
-                        borderColor: "#ff6b35",
-                        backgroundColor: "rgba(255,107,53,0.12)",
+                        borderColor: "#8f6210",
+                        backgroundColor: "rgba(143,98,16,0.12)",
                         fill: true,
                         tension: 0.3,
                         pointRadius: 4,
-                        pointBackgroundColor: "#ff6b35"
+                        pointBackgroundColor: "#8f6210"
                     }]
                 },
                 options: {
@@ -1732,7 +1741,7 @@
                     datasets: [{
                         label: t("qty_axis"),
                         data: top.map(i => i.qty_sold),
-                        backgroundColor: "#7c3aed"
+                        backgroundColor: "#1f6f63"
                     }]
                 },
                 options: {
@@ -1781,7 +1790,7 @@
                         datasets: [{
                             label: t("qty_axis"),
                             data: items.map(i => i.qty_sold),
-                            backgroundColor: "#ff6b35"
+                            backgroundColor: "#8f6210"
                         }]
                     },
                     options: {
@@ -1821,7 +1830,7 @@
                     datasets: [{
                         label: t("revenue_axis"),
                         data: waiters.map(w => w.revenue),
-                        backgroundColor: "#1d7d72"
+                        backgroundColor: "#1f6f63"
                     }]
                 },
                 options: {
@@ -1863,7 +1872,7 @@
                 window._tablesCache = tables;
                 const list = document.getElementById("tablesList");
                 if (!tables.length) {
-                    list.innerHTML = `<p style="color:#999;">${t("no_tables")}</p>`;
+                    list.innerHTML = `<p style="color:var(--text-4);">${t("no_tables")}</p>`;
                     return;
                 }
                 list.innerHTML = tables.map(tbl => {
@@ -1967,7 +1976,7 @@
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
                             <h2>${t("orders_for_table", safeLabel)}</h2>
-                            <p style="color:#1d7d72; font-weight:600; margin:12px 0;">${t("table_not_occupied")}</p>
+                            <p style="color:var(--live); font-weight:600; margin:12px 0;">${t("table_not_occupied")}</p>
                         `;
                         return;
                     }
@@ -1976,7 +1985,7 @@
                         .then(r => r.json())
                         .then(session => {
                             if (session.error) {
-                                content.innerHTML = `<h2>${t("orders_for_table", safeLabel)}</h2><p style="color:#999;">${t("table_not_occupied")}</p>`;
+                                content.innerHTML = `<h2>${t("orders_for_table", safeLabel)}</h2><p style="color:var(--text-4);">${t("table_not_occupied")}</p>`;
                                 return;
                             }
 
@@ -1996,26 +2005,26 @@
                                             if (o.status === "APPROVED" && !o.paid && session.status === "OPEN") {
                                                 actionsHtml = `<button class="danger" onclick="voidOrderFromDashboard('${o.order_id}')">${t("void")}</button>`;
                                             } else if (o.status === "APPROVED" && o.paid) {
-                                                actionsHtml = `<span style="font-size:12px;color:#1d7d72;font-weight:700;">${t("paid_tag")}</span>`;
+                                                actionsHtml = `<span style="font-size:12px;color:var(--live);font-weight:700;">${t("paid_tag")}</span>`;
                                             } else {
-                                                actionsHtml = `<span style="font-size:12px;color:#999;">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
+                                                actionsHtml = `<span style="font-size:12px;color:var(--text-4);">${t("status_labels")[o.status] || o.status}${o.handled_by ? ' ' + t("by", escapeHtml(o.handled_by)) : ''}</span>`;
                                             }
                                             return `
                                                 <div class="order-line">
                                                     <div class="info">
                                                         ${statusEmoji[o.status] || ""} ${o.qty}x ${escapeHtml(o.item)} — €${(o.price * o.qty).toFixed(2)}
-                                                        ${extrasList ? `<div style="font-size:11.5px; color:#1d5fd7; margin-top:2px;">+ ${extrasList}</div>` : ""}
-                                                        ${o.note ? `<div style="font-size:13px; color:#e74c3c; font-weight:700; font-style:italic; margin-top:3px;">💬 ${escapeHtml(o.note)}</div>` : ""}
+                                                        ${extrasList ? `<div style="font-size:11.5px; color:var(--accent); margin-top:2px;">+ ${extrasList}</div>` : ""}
+                                                        ${o.note ? `<div style="font-size:13px; color:var(--warn); font-weight:700; font-style:italic; margin-top:3px;">💬 ${escapeHtml(o.note)}</div>` : ""}
                                                     </div>
                                                     <div class="actions">${actionsHtml}</div>
                                                 </div>
                                             `;
                                         }).join("")
-                                        : `<p style="color:#999; padding:10px 0;">${t("no_orders")}</p>`;
+                                        : `<p style="color:var(--text-4); padding:10px 0;">${t("no_orders")}</p>`;
 
                                     content.innerHTML = `
                                         <h2>${t("orders_for_table", safeLabel)}</h2>
-                                        <p style="font-size:18px; font-weight:800; color:#ff6b35; margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
+                                        <p style="font-family: var(--display); font-size:22px; font-weight:400; color:var(--accent); margin:10px 0;">${t("bill_so_far", billTotal.toFixed(2))}</p>
                                         ${ordersHtml}
                                     `;
                                 });
@@ -2062,7 +2071,7 @@
                     renderKitchenStationLinks();
 
                     if (!items.length) {
-                        list.innerHTML = `<p style="color:#999;">${t("no_items")}</p>`;
+                        list.innerHTML = `<p style="color:var(--text-4);">${t("no_items")}</p>`;
                         return;
                     }
 
@@ -2091,7 +2100,7 @@
                                 : "";
                             return `
                             <div class="menu-item-row ${item.available ? '' : 'unavailable'} ${isOut ? 'out-of-stock' : ''}">
-                                <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='#f0f0f0'; this.src='';">
+                                <img class="item-thumb" src="${escapeHtml(item.image || '')}" onerror="this.style.background='var(--surface-2)'; this.src='';">
                                 <div class="item-info">
                                     <div class="name">${escapeHtml(item.name)} ${item.available ? '' : t("unavailable_suffix")}</div>
                                     <div class="price">€${Number(item.price).toFixed(2)}</div>
@@ -2273,6 +2282,67 @@
                     closeEdit();
                     loadMenuItems();
                 });
+        }
+
+        function getKnownStations() {
+            const items = window._menuItemsCache || [];
+            const stations = items
+                .map(i => (i.kitchen_station || "").trim())
+                .filter(Boolean);
+            return [...new Set(stations)];
+        }
+
+        function populateStationSuggestions() {
+            const datalist = document.getElementById("stationSuggestions");
+            if (!datalist) return;
+            const stations = getKnownStations();
+            datalist.innerHTML = stations.map(s => `<option value="${escapeHtml(s)}">`).join("");
+        }
+
+        function renderKitchenStationLinks() {
+            const kitchenBase = "https://katina-bot-2.onrender.com/kitchen.html";
+            const stations = getKnownStations();
+            const list = document.getElementById("kitchenLinksList");
+            if (!list) return;
+
+            let html = `
+                <div class="table-row">
+                    <div class="info"><div class="name">${t("all_stations_label")}</div></div>
+                    <div class="actions">
+                        <input type="text" readonly value="${kitchenBase}" style="width:200px; font-size:12px; padding:8px;" onclick="this.select()">
+                        <button class="secondary" onclick="copyStationLink('${kitchenBase}', this)">${t("copy_label")}</button>
+                    </div>
+                </div>
+            `;
+
+            if (!stations.length) {
+                html += `<p style="color:var(--text-4); font-size:13px; margin-top:10px;">${t("no_stations_msg")}</p>`;
+                list.innerHTML = html;
+                return;
+            }
+
+            stations.forEach(station => {
+                const url = `${kitchenBase}?station=${encodeURIComponent(station)}`;
+                html += `
+                    <div class="table-row">
+                        <div class="info"><div class="name">👨‍🍳 ${escapeHtml(station)}</div></div>
+                        <div class="actions">
+                            <input type="text" readonly value="${url}" style="width:220px; font-size:12px; padding:8px;" onclick="this.select()">
+                            <button class="secondary" onclick="copyStationLink('${url}', this)">${t("copy_label")}</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        function copyStationLink(url, btn) {
+            navigator.clipboard.writeText(url).then(() => {
+                const original = btn.innerText;
+                btn.innerText = t("copied_label");
+                setTimeout(() => { btn.innerText = original; }, 1500);
+            });
         }
 
         applyStaticText();
