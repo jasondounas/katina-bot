@@ -6,29 +6,29 @@
         @import url('https://fonts.googleapis.com/css2?family=Commissioner:wght@300..700&family=GFS+Didot&display=swap');
 
         :root {
-            --stage: #100e0c;
-            --screen: #17130f;
-            --surface: #1e1915;
-            --surface-2: #262019;
-            --surface-3: #2f2820;
-            --text: #efe9e0;
-            --text-2: #cdc4b6;
-            --text-3: #9c9082;
-            --text-4: #6b6156;
-            --accent: #d9a75b;
-            --accent-hover: #e5b568;
+            --stage: #1c1c1c;
+            --screen: #202020;
+            --surface: #292929;
+            --surface-2: #333333;
+            --surface-3: #3d3d3d;
+            --text: #eeeeec;
+            --text-2: #c9c8c4;
+            --text-3: #9a9894;
+            --text-4: #706e6a;
+            --accent: #c99a4e;
+            --accent-hover: #d6a95e;
             --on-accent: #1b1409;
-            --accent-soft: rgba(217, 167, 91, 0.14);
-            --accent-line: rgba(217, 167, 91, 0.34);
-            --live: #7ab5a9;
-            --live-soft: rgba(122, 181, 169, 0.14);
-            --warn: #cd6f4f;
-            --warn-soft: rgba(205, 111, 79, 0.14);
-            --warn-line: rgba(205, 111, 79, 0.30);
-            --line: rgba(239, 233, 224, 0.09);
-            --line-mid: rgba(239, 233, 224, 0.15);
-            --line-strong: rgba(239, 233, 224, 0.26);
-            --hover: rgba(239, 233, 224, 0.04);
+            --accent-soft: rgba(201, 154, 78, 0.12);
+            --accent-line: rgba(201, 154, 78, 0.30);
+            --live: #6fa89b;
+            --live-soft: rgba(111, 168, 155, 0.14);
+            --warn: #c07158;
+            --warn-soft: rgba(192, 113, 88, 0.14);
+            --warn-line: rgba(192, 113, 88, 0.30);
+            --line: rgba(238, 238, 236, 0.09);
+            --line-mid: rgba(238, 238, 236, 0.15);
+            --line-strong: rgba(238, 238, 236, 0.26);
+            --hover: rgba(238, 238, 236, 0.04);
             --display: 'GFS Didot', 'Didot', 'Iowan Old Style', Georgia, serif;
             --ui: 'Commissioner', 'Helvetica Neue', Arial, sans-serif;
             --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
@@ -103,13 +103,13 @@
             display: flex;
             align-items: center;
             gap: 9px;
-            transition: transform 0.15s var(--ease, ease), border-color 0.15s;
+            transition: transform 0.15s ease, border-color 0.15s;
         }
         .stock-item-btn:active { transform: scale(0.96); }
         .stock-item-btn.out {
             background: var(--warn-soft);
             border-color: var(--warn-line);
-            color: #f0b39d;
+            color: #e8bbac;
         }
         .stock-item-btn .dot {
             width: 8px; height: 8px;
@@ -189,7 +189,7 @@
             border: 1px solid var(--warn-line);
             border-radius: var(--r-md);
             padding: 12px 14px;
-            color: #f0b39d;
+            color: #e8bbac;
             font-size: 17px;
             font-style: italic;
             font-weight: 600;
@@ -200,7 +200,7 @@
             margin-top: 18px;
             background: var(--live);
             border: none;
-            color: var(--on-accent);
+            color: #0f2320;
             padding: 14px 22px;
             border-radius: var(--r-md);
             cursor: pointer;
