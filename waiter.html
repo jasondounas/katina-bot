@@ -304,65 +304,50 @@
             padding: 3px 10px; border-radius: 20px;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-            gap: 16px;
-        }
+        .table-list { display: flex; flex-direction: column; gap: 8px; }
 
-        .card {
+        .table-item {
             background: var(--surface);
             border: 1px solid var(--line);
-            border-radius: var(--r-lg);
-            overflow: hidden;
-            box-shadow: var(--card-shadow);
-            cursor: pointer;
-            transition: transform 0.15s;
-            position: relative;
-        }
-        .card:hover { transform: translateY(-3px); }
-        .icon-row {
-            position: absolute;
-            top: 10px; right: 10px;
-            z-index: 2;
+            border-left: 4px solid var(--line-mid);
+            border-radius: var(--r-md);
+            padding: 14px 16px;
             display: flex;
-            gap: 8px;
-        }
-        .card-icon-btn {
-            font-size: 15px;
-            opacity: 0.55;
+            align-items: center;
+            gap: 12px;
             cursor: pointer;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.1s;
         }
-        .card-icon-btn:hover { opacity: 1; }
+        .table-item:active { transform: scale(0.99); }
+        .table-item.called { border-left-color: var(--called); }
+        .table-item.pay { border-left-color: var(--pay); }
+        .table-item.ready { border-left-color: var(--ready); }
+        .table-item.pending { border-left-color: var(--accent); }
+        .table-item.release { border-left-color: var(--text-4); }
+        .table-item.empty { border-left-color: var(--live); }
 
-        .card-alert {
-            padding: 10px 16px;
-            font-size: 12.5px;
+        .table-item .ti-main { flex: 1; min-width: 0; }
+        .table-item .ti-name { font-weight: 700; font-size: 16px; color: var(--text); }
+        .table-item .ti-sub {
+            font-size: 12.5px; color: var(--text-3); margin-top: 3px;
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .table-item .ti-alert-text { font-weight: 700; }
+        .table-item .ti-alert-text.called { color: var(--called); }
+        .table-item .ti-alert-text.pay { color: var(--pay); }
+        .table-item .ti-alert-text.ready { color: var(--ready); }
+        .table-item .ti-alert-text.pending { color: var(--accent); }
+        .table-item .ti-alert-text.release { color: var(--text-4); }
+        .table-item .ti-badge {
+            background: var(--surface-2);
+            color: var(--text-3);
+            font-size: 11.5px;
             font-weight: 700;
-            color: white;
+            padding: 2px 8px;
+            border-radius: 100px;
         }
-        .card-alert.called { background: var(--called); }
-        .card-alert.pay { background: var(--pay); }
-        .card-alert.pending { background: var(--accent); }
-        .card-alert.ready { background: var(--ready); }
-        .card-alert.release { background: var(--text-4); }
-
-        .card-body { padding: 18px; border-top: 4px solid var(--line); }
-        .card.empty .card-body { border-top-color: var(--live); }
-        .card.has-alert .card-body { border-top: none; padding-top: 14px; }
-
-        .card h3 { font-family: var(--ui); font-size: 18px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
-        .card-stats { display: flex; flex-wrap: wrap; gap: 8px; }
-        .stat {
-            font-size: 13px; font-weight: 700;
-            background: var(--surface-2); color: var(--text-3);
-            padding: 6px 12px; border-radius: var(--r-md);
-            display: flex; align-items: center; gap: 5px;
-        }
-        .stat.paid { background: var(--live-soft); color: var(--live); }
-        .stat.unpaid { background: var(--warn-soft); color: var(--warn); }
-        .stat.empty-stat { background: var(--live-soft); color: var(--live); }
-        .stat.occupied-stat { background: var(--accent-soft); color: var(--accent); }
+        .table-item .ti-chevron { color: var(--text-4); font-size: 18px; flex-shrink: 0; }
 
         .overlay {
             display: none;
@@ -523,7 +508,7 @@
             <span class="bar"></span><span id="tablesTitle">Tables</span>
             <span class="count-badge" id="tableCount">0</span>
         </div>
-        <div class="grid" id="tableGrid">
+        <div class="table-list" id="tableGrid">
             <div class="loading-block"><div class="spinner"></div></div>
         </div>
     </div>
@@ -1069,37 +1054,43 @@
                         grid.innerHTML = `<div class="loading-block">—</div>`;
                     }
 
+                    const rowEntries = [];
+
                     tables.forEach(tbl => {
                         const label = tbl.display_label || tbl.table_id;
                         const safeLabel = escapeHtml(label);
                         const session = sessionByTableId[tbl.table_id];
-                        const historyIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openTableHistory('${tbl.table_id}', '${safeLabel}')">🕘</span>`;
 
                         if (!session) {
-                            grid.innerHTML += `
-                                <div class="card empty" onclick="openTableModal('${tbl.table_id}')">
-                                    <div class="icon-row">${historyIcon}</div>
-                                    <div class="card-body">
-                                        <h3>${safeLabel}</h3>
-                                        <div class="card-stats"><span class="stat empty-stat">${t("empty")}</span></div>
+                            rowEntries.push({
+                                priority: 6,
+                                html: `
+                                    <div class="table-item empty" onclick="openTableModal('${tbl.table_id}')">
+                                        <div class="ti-main">
+                                            <div class="ti-name">${safeLabel}</div>
+                                            <div class="ti-sub">${t("empty")}</div>
+                                        </div>
+                                        <span class="ti-chevron">›</span>
                                     </div>
-                                </div>
-                            `;
+                                `,
+                            });
                             return;
                         }
 
                         if (session.status !== "OPEN") {
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("needs_release_short"), type: "release" });
-                            grid.innerHTML += `
-                                <div class="card has-alert" onclick="openTableModal('${tbl.table_id}')">
-                                    <div class="icon-row">${historyIcon}</div>
-                                    <div class="card-alert release">${t("needs_release")}</div>
-                                    <div class="card-body">
-                                        <h3>${safeLabel}</h3>
-                                        <div class="card-stats"><span class="stat">${t("session_status", session.status)}</span></div>
+                            rowEntries.push({
+                                priority: 3,
+                                html: `
+                                    <div class="table-item release" onclick="openTableModal('${tbl.table_id}')">
+                                        <div class="ti-main">
+                                            <div class="ti-name">${safeLabel}</div>
+                                            <div class="ti-sub"><span class="ti-alert-text release">${t("needs_release")}</span></div>
+                                        </div>
+                                        <span class="ti-chevron">›</span>
                                     </div>
-                                </div>
-                            `;
+                                `,
+                            });
                             return;
                         }
 
@@ -1120,17 +1111,18 @@
 
                         let bannerClass = "";
                         let bannerText = "";
+                        let priority = 5;
                         if (session.waiter_called) {
-                            bannerClass = "called"; bannerText = t("calling_waiter");
+                            bannerClass = "called"; bannerText = t("calling_waiter"); priority = 0;
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("called_for_waiter"), type: "called" });
                         } else if (session.payment_requested) {
                             const methodLabel = paymentMethodLabel(session.payment_method);
-                            bannerClass = "pay"; bannerText = t("wants_to_pay", methodLabel);
+                            bannerClass = "pay"; bannerText = t("wants_to_pay", methodLabel); priority = 1;
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("requested_bill", methodLabel), type: "pay" });
                         } else if (ready > 0) {
-                            bannerClass = "ready"; bannerText = t("order_ready_banner");
+                            bannerClass = "ready"; bannerText = t("order_ready_banner"); priority = 2;
                         } else if (pending > 0) {
-                            bannerClass = "pending"; bannerText = t("new_orders", pending);
+                            bannerClass = "pending"; bannerText = t("new_orders", pending); priority = 4;
                         }
                         if (ready > 0) {
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("order_ready_alert", ready), type: "ready" });
@@ -1139,29 +1131,28 @@
                             currentAlerts.push({ tableId: tbl.table_id, label, text: t("orders_awaiting", pending), type: "orders" });
                         }
 
-                        const bannerHtml = bannerClass
-                            ? `<div class="card-alert ${bannerClass}">${bannerText}</div>`
-                            : "";
-
-                        const moveIcon = `<span class="card-icon-btn" onclick="event.stopPropagation(); openMovePicker('${tbl.table_id}', '${safeLabel}')">⇄</span>`;
-
                         const statusStat = getStatusStat(session);
+                        const alertHtml = bannerClass
+                            ? `<span class="ti-alert-text ${bannerClass}">${bannerText}</span>`
+                            : `<span>${t("people", session.party_size)} · ${statusStat.label}</span>`;
+                        const pendingBadge = pending > 0 ? `<span class="ti-badge">${t("pending_short", pending)}</span>` : "";
 
-                        grid.innerHTML += `
-                            <div class="card ${bannerClass ? 'has-alert' : ''}" onclick="openTableModal('${tbl.table_id}')">
-                                <div class="icon-row">${moveIcon}${historyIcon}</div>
-                                ${bannerHtml}
-                                <div class="card-body">
-                                    <h3>${safeLabel}</h3>
-                                    <div class="card-stats">
-                                        <span class="stat">${t("people", session.party_size)}</span>
-                                        <span class="stat ${statusStat.cls}">${statusStat.label}</span>
-                                        ${pending > 0 ? `<span class="stat">${t("pending_short", pending)}</span>` : ""}
+                        rowEntries.push({
+                            priority,
+                            html: `
+                                <div class="table-item ${bannerClass}" onclick="openTableModal('${tbl.table_id}')">
+                                    <div class="ti-main">
+                                        <div class="ti-name">${safeLabel}</div>
+                                        <div class="ti-sub">${alertHtml}${pendingBadge}</div>
                                     </div>
+                                    <span class="ti-chevron">›</span>
                                 </div>
-                            </div>
-                        `;
+                            `,
+                        });
                     });
+
+                    rowEntries.sort((a, b) => a.priority - b.priority);
+                    grid.innerHTML += rowEntries.map(r => r.html).join("");
 
                     const outOfStockItems = (menuItems || []).filter(i => i.stock !== null && i.stock !== undefined && i.stock <= 0);
                     outOfStockItems.forEach(item => {
@@ -1270,7 +1261,8 @@
                     const table = tables.find(t => t.table_id === tableId);
                     const label = table ? (table.display_label || table.table_id) : tableId;
                     const safeLabel = escapeHtml(label);
-                    const renameIcon = `<span onclick="renameTable('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:var(--accent); margin-left:8px;">✏️</span>`;
+                    const renameIcon = `<span onclick="renameTable('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:var(--accent); margin-left:8px;">✏️</span>
+                        <span onclick="openTableHistory('${tableId}', '${safeLabel}')" style="cursor:pointer; font-size:16px; color:var(--text-4); margin-left:8px;">🕘</span>`;
 
                     if (!table || !table.active_session_id) {
                         content.innerHTML = `
