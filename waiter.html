@@ -25,6 +25,9 @@
             --warn: #9e3f1f;
             --warn-soft: rgba(158, 63, 31, 0.10);
             --warn-line: rgba(158, 63, 31, 0.32);
+            --called: #b9770e;
+            --pay: #445566;
+            --ready: #1b4d3e;
             --line: rgba(26, 23, 20, 0.13);
             --line-mid: rgba(26, 23, 20, 0.16);
             --hover: rgba(26, 23, 20, 0.04);
@@ -100,9 +103,9 @@
             animation: slideDown 0.3s ease, fadeOut 0.3s ease 4.5s forwards;
             border-left: 4px solid var(--d-accent);
         }
-        .toast.called { border-left-color: #f39c12; }
-        .toast.pay { border-left-color: #7c3aed; }
-        .toast.ready { border-left-color: #d81b60; }
+        .toast.called { border-left-color: var(--called); }
+        .toast.pay { border-left-color: var(--pay); }
+        .toast.ready { border-left-color: var(--ready); }
         .toast.stock { border-left-color: var(--warn); }
         .toast.stock_shortage { border-left-color: var(--warn); }
         .toast .toast-icon { font-size: 22px; }
@@ -338,10 +341,10 @@
             font-weight: 700;
             color: white;
         }
-        .card-alert.called { background: #f39c12; }
-        .card-alert.pay { background: #7c3aed; }
+        .card-alert.called { background: var(--called); }
+        .card-alert.pay { background: var(--pay); }
         .card-alert.pending { background: var(--accent); }
-        .card-alert.ready { background: #d81b60; }
+        .card-alert.ready { background: var(--ready); }
         .card-alert.release { background: var(--text-4); }
 
         .card-body { padding: 18px; border-top: 4px solid var(--line); }
@@ -1323,7 +1326,7 @@
                                             }
 
                                             const readyTag = (o.status === "APPROVED" && o.ready)
-                                                ? `<div style="font-size:11.5px; color:#d81b60; font-weight:700; margin-top:2px;">${t("ready_tag")}</div>`
+                                                ? `<div style="font-size:11.5px; color:var(--ready); font-weight:700; margin-top:2px;">${t("ready_tag")}</div>`
                                                 : "";
 
                                             return `
@@ -1342,12 +1345,12 @@
 
                                     let alerts = "";
                                     if (session.waiter_called) {
-                                        alerts += `<p style="color:#f39c12; font-weight:700; margin:10px 0;">${t("table_called_msg")}
+                                        alerts += `<p style="color:var(--called); font-weight:700; margin:10px 0;">${t("table_called_msg")}
                                             <button class="secondary" onclick="acknowledgeCall()" style="margin-left:8px;">${t("acknowledge")}</button></p>`;
                                     }
                                     if (session.payment_requested) {
                                         const methodLabel = paymentMethodLabel(session.payment_method);
-                                        alerts += `<p style="color:#7c3aed; font-weight:700; margin:10px 0;">${t("table_requested_bill_msg", methodLabel)}</p>`;
+                                        alerts += `<p style="color:var(--pay); font-weight:700; margin:10px 0;">${t("table_requested_bill_msg", methodLabel)}</p>`;
                                     }
 
                                     const bulkButtons = `
